@@ -1,0 +1,45 @@
+---
+title: "About This Project"
+---
+
+## Shadow Tealbook A
+
+This is a research prototype developed at **Purdue University** that replicates 
+the structure and analytical approach of the Federal Reserve's Tealbook A — the 
+internal briefing document prepared for each FOMC meeting.
+
+### What it does
+
+- Pulls current economic data automatically from FRED (Federal Reserve Bank of St. Louis)
+- Generates Tealbook-style interpretive narratives using a large language model (Claude, Anthropic)
+- Identifies potential special topics using live Federal Reserve speech and working paper feeds
+- Rerenders automatically on a schedule via GitHub Actions
+
+### Data sources
+
+| Source | Series |
+|--------|---------|
+| FRED (St. Louis Fed) | GDP, unemployment, inflation, financial conditions |
+| Dallas Fed | Trimmed mean PCE |
+| BLS via FRED | Import prices, ECI, AHE, JOLTS |
+| BEA via FRED | PCE components |
+| Federal Reserve | Speeches (RSS), FEDS working papers (RSS) |
+| Philadelphia Fed | Survey of Professional Forecasters (SPF) — manually updated |
+| FOMC | Longer-run SEP — manually updated each cycle |
+
+### Methodology notes
+
+- All FRED pulls use a local parquet cache (refreshed every 12 hours)
+- LLM narratives are regenerated at each render using current data
+- Forecasts (SPF, FOMC SEP) are hard-coded and updated manually each FOMC cycle
+- International GDP section pending IMF IFS API integration
+- Financial markets section uses FRED; equity data integration pending
+
+### Disclaimer
+
+This document is a **research project** and does not represent the views of the 
+Federal Reserve System, the Federal Open Market Committee, or any Federal Reserve 
+Bank. It is produced solely for academic purposes.
+
+---
+*Purdue University — MGMT/Economics Research*
