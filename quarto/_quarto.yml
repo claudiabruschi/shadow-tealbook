@@ -1,1 +1,25 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Shadow Tealbook A"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+
+format:
+  html:
+    theme: cosmo
+    toc: false
+    page-layout: full
+
+execute:
+  freeze: false
+  echo: false
+  warning: false
+  message: false
+
+engine: jupyter
 
