@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 12 * * 1'   # Every Monday 12pm UTC (8am ET)
+    - cron: '0 12 * * 1'
   workflow_dispatch:
 
 env:
@@ -37,24 +37,22 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
           pip install jupyter ipykernel nbformat nbclient
+          pip install -r requirements.txt
           python -m ipykernel install --user
-          python -c "import jupyter; print('Jupyter OK')"
-          python -c "import fredapi; print('fredapi OK')"
-          python -c "import plotly; print('plotly OK')"
+          echo "Python path: $(which python3)"
+          echo "Jupyter path: $(which jupyter)"
+          python -c "import jupyter; print('jupyter OK')"
+          python -c "import ipykernel; print('ipykernel OK')"
 
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
-
-      - name: Check Quarto Python
-        run: |
-          quarto check jupyter
 
       - name: Render Quarto site
         env:
           FRED_API_KEY:      ${{ secrets.FRED_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          QUARTO_PYTHON:     /opt/hostedtoolcache/Python/3.11.15/x64/bin/python3
         run: |
           cd quarto
           quarto render
