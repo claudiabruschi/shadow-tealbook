@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+
+# Quarto output
+quarto/_site/
+quarto/.quarto/
+*_files/
+
+# FRED cache (regenerated at render time)
+data/cache/
+
+# Beige Book cache — commit this if you want to preserve manual updates
+# data/beige_book_latest.txt
+
+# Secrets — never commit these
+config.py
+*api_key*
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

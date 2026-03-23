@@ -1,0 +1,10 @@
+pandas
+numpy
+requests
+fredapi
+pyarrow
+openpyxl
+plotly
+kaleido
+anthropic
+urllib3
