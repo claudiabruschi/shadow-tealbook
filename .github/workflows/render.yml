@@ -5,7 +5,10 @@ on:
     branches: [main]
   schedule:
     - cron: '0 12 * * 1'   # Every Monday 12pm UTC (8am ET)
-  workflow_dispatch:         # Manual trigger
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -24,22 +27,29 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install Python dependencies
         run: |
-          pip install \
-            pandas numpy requests fredapi pyarrow openpyxl \
-            plotly kaleido anthropic
+          pip install -r requirements.txt
+          pip install jupyter ipykernel nbformat nbclient
+          python -m ipykernel install --user
+          python -c "import jupyter; print('Jupyter OK')"
+          python -c "import fredapi; print('fredapi OK')"
+          python -c "import plotly; print('plotly OK')"
 
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Check Quarto Python
+        run: |
+          quarto check jupyter
 
       - name: Render Quarto site
         env:
@@ -55,7 +65,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: quarto/_site   # adjust if your output dir is different
+          path: quarto/_site
 
       - name: Deploy to GitHub Pages
         id: deployment
