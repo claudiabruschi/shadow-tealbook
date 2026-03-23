@@ -8,3 +8,8 @@ plotly
 kaleido
 anthropic
 urllib3
+python-dateutil
+jupyter
+nbformat
+nbclient
+ipykernel
