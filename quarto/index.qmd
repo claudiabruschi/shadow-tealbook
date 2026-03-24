@@ -23,33 +23,25 @@ sys.path.insert(0, str(Path('.').resolve().parent))
 from data.fred_pulls import pull_series, get_series
 
 # ── Global color & line system ────────────────────────────────────────────────
-# Rule: BLUE=primary/actual, RED=secondary/forecast, GRAY=tertiary/alternative
-# Solid=primary series, Dash=secondary series, Dot=reference/target
-C1   = '#003087'   # Fed blue  — primary series / actuals
-C2   = '#C41E3A'   # Fed red   — secondary series / forecasts
-C3   = '#6B6B6B'   # Gray      — alternative/reference
-C4   = '#2E7D32'   # Green     — special (e.g. PCE growth)
-C5   = '#E65100'   # Orange    — volatility indicators
-# Aliases kept for backward compat
-BLUE = C1; RED = C2; GRAY = C3; GREEN = C4; ORANGE = C5
-
-L_SOLID  = dict(dash='solid')
-L_DASH   = dict(dash='dash')
-L_DOT    = dict(dash='dot')
-W_THICK  = 2.0   # primary line width
-W_MED    = 1.5   # secondary line width
-W_THIN   = 1.2   # tertiary line width
+# C1 = Fed blue  = primary series / actuals        (solid)
+# C2 = Fed red   = secondary series / forecasts    (dash)
+# C3 = Gray      = alternative / reference lines   (dot)
+# C4 = Green     = used ONLY for PCE growth chart
+# C5 = Orange    = volatility indicators (VIX, claims)
+C1 = '#003087'; C2 = '#C41E3A'; C3 = '#6B6B6B'; C4 = '#2E7D32'; C5 = '#E65100'
+BLUE = C1; RED = C2; GRAY = C3; GREEN = C4; ORANGE = C5  # aliases
 
 def line(color, style='solid', width=None):
-    w = width if width else (W_THICK if style=='solid' else W_MED)
+    """Consistent line style helper — always use this, never hardcode."""
+    w = width if width else (2.0 if style == 'solid' else 1.5)
     return dict(color=color, width=w, dash=style)
 
 # ── Chart windows ─────────────────────────────────────────────────────────────
-TODAY        = datetime.today()
-CHART_START  = (TODAY - timedelta(days=6*365)).strftime('%Y-%m-%d')
+TODAY           = datetime.today()
+CHART_START     = (TODAY - timedelta(days=6*365)).strftime('%Y-%m-%d')
 CHART_START_GDP = '2015-01-01'
-DATA_START   = '2010-01-01'
-now_str      = TODAY.strftime('%B %d, %Y')
+DATA_START      = '2010-01-01'
+now_str         = TODAY.strftime('%B %d, %Y')
 
 # ── Date helpers ──────────────────────────────────────────────────────────────
 def quarter_label(dt):
@@ -80,11 +72,9 @@ def next_fig():
 
 # ── Plotly layout helpers ─────────────────────────────────────────────────────
 def fed_layout(title='', height=420, showlegend=True):
-    """3-panel subplots layout (Overview/Labor/Inflation/Financial)."""
     return dict(
         title=dict(text=title, font=dict(size=13, color='#222')),
-        height=height,
-        plot_bgcolor='white', paper_bgcolor='white',
+        height=height, plot_bgcolor='white', paper_bgcolor='white',
         font=dict(family='Source Sans Pro, Arial, sans-serif', size=11),
         legend=dict(orientation='h', yanchor='bottom', y=1.02,
                     xanchor='left', x=0, font=dict(size=10)),
@@ -103,7 +93,6 @@ def xaxis_cfg(start=CHART_START_GDP):
                 type='date', range=[start, today])
 
 def base_layout(title, subtitle=None, start=CHART_START_GDP, r_margin=15):
-    """2-per-row GDP/detail chart layout."""
     full_title = (f'<b style="font-size:11px">{title}</b>'
                   + (f'<br><span style="font-size:10px;color:#666">{subtitle}</span>'
                      if subtitle else ''))
@@ -117,8 +106,8 @@ def base_layout(title, subtitle=None, start=CHART_START_GDP, r_margin=15):
         yaxis=dict(showgrid=True, gridcolor='#eeeeee', zeroline=False,
                    tickfont=dict(size=9), autorange=True),
         legend=dict(orientation='h', yanchor='top', y=-0.18,
-                    xanchor='center', x=0.5,
-                    font=dict(size=9), bgcolor='rgba(0,0,0,0)'),
+                    xanchor='center', x=0.5, font=dict(size=9),
+                    bgcolor='rgba(0,0,0,0)'),
         font=dict(family='Arial, sans-serif', size=10),
         hovermode='x unified',
     )
@@ -129,8 +118,7 @@ _pending = []
 
 def _flush():
     global _pending
-    if not _pending:
-        return
+    if not _pending: return
     if len(_pending) == 1:
         h, s = _pending[0]
         display(HTML(f'<div style="margin-bottom:2rem;">{h}'
@@ -160,10 +148,8 @@ of the Tealbook A — the internal briefing document prepared for FOMC meetings.
 Style rules:
 - Third person, no first-person pronouns
 - Every claim must reference a specific number AND its time period
-- Present tense for current conditions; disciplined forward-looking language for projections
-- No hedging phrases like 'it seems' or 'may suggest'
-- Do not invent numbers; only use what is given
 - Complete every sentence fully — never truncate mid-sentence
+- Do not invent numbers; only use what is given
 Respond with narrative text only — no headers, no bullet points, no markdown."""
 
 def call_claude(user_prompt, max_tokens=450):
@@ -202,8 +188,8 @@ import io, requests as _req
 gdp_g    = pull_series('A191RL1Q225SBEA', start=DATA_START).dropna()
 unrate   = pull_series('UNRATE',          start=DATA_START).dropna()
 core_pce = pull_series('PCEPILFE',        start=DATA_START).dropna().pct_change(12).mul(100).dropna()
-cpi_ov   = pull_series('CPIAUCSL',        start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 pce_ov   = pull_series('PCEPI',           start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+cpi_ov   = pull_series('CPIAUCSL',        start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 payrolls = pull_series('PAYEMS',          start=DATA_START).dropna().diff().dropna()
 nrou     = pull_series('NROU',            start=DATA_START).dropna().resample('MS').interpolate()
 t10      = pull_series('DGS10',           start=DATA_START).dropna().resample('MS').mean()
@@ -220,9 +206,6 @@ ugap          = unrate_latest - nrou_latest
 core_latest   = core_pce.iloc[-1]
 core_date     = month_label(pd.Timestamp(core_pce.index[-1]))
 pce_latest    = pce_ov.iloc[-1]
-pce_date_ov   = month_label(pd.Timestamp(pce_ov.index[-1]))
-cpi_latest    = cpi_ov.iloc[-1]
-cpi_date_ov   = month_label(pd.Timestamp(cpi_ov.index[-1]))
 payroll_3m    = payrolls.iloc[-3:].mean()
 payroll_date  = month_label(pd.Timestamp(payrolls.index[-1]))
 t10_latest    = t10.iloc[-1]
@@ -236,28 +219,35 @@ fomc_lr_gdp   = 1.8
 fomc_lr_unemp = 4.1
 fomc_lr_pce   = 2.0
 
-# ── Pull SPF for comparison table ────────────────────────────────────────────
+# ── SPF for comparison table ──────────────────────────────────────────────────
 SPF_BASE_OV = ('https://www.philadelphiafed.org/-/media/FRBP/Assets/'
                'Surveys-And-Data/survey-of-professional-forecasters/'
                'data-files/files/Median_{}_Growth.xlsx')
+SPF_BASE_LV = ('https://www.philadelphiafed.org/-/media/FRBP/Assets/'
+               'Surveys-And-Data/survey-of-professional-forecasters/'
+               'data-files/files/Median_{}_Level.xlsx')
 
-def _spf_annual(name, row_idx=-1):
-    """Pull SPF Q4/Q4 annual forecasts for comparison table."""
+def _spf_q4(name, row_idx=-1, level=False):
+    """
+    Pull SPF Q4/Q4 annual forecasts for comparison table.
+    level=True for unemployment (level file, column = just name+horizon number).
+    Returns dict {year: value}.
+    """
     try:
-        r = _req.get(SPF_BASE_OV.format(name), timeout=20)
+        url_base = SPF_BASE_LV if level else SPF_BASE_OV
+        r = _req.get(url_base.format(name), timeout=20)
         r.raise_for_status()
         df = pd.read_excel(io.BytesIO(r.content), engine='openpyxl')
         df.columns = [str(c).strip() for c in df.columns]
         df_c = df.dropna(subset=['YEAR','QUARTER'])
-        prefix = f'D{name}'
-        col2 = f'{prefix}2'
-        if col2 in df_c.columns:
-            df_c = df_c[df_c[col2].notna()]
         if len(df_c) < abs(row_idx):
             return {}
         row  = df_c.iloc[row_idx]
         year = int(row['YEAR'])
         qtr  = int(row['QUARTER'])
+        # For level series, columns are just NAME+h (e.g. UNEMP2..UNEMP6)
+        # For growth series, columns are D+NAME+h (e.g. DRGDP2..DRGDP6)
+        prefix = name if level else f'D{name}'
         out = {}
         for h in range(2, 7):
             col = f'{prefix}{h}'
@@ -266,87 +256,92 @@ def _spf_annual(name, row_idx=-1):
                 total  = (qtr - 1) + offset
                 y_out  = year + total // 4
                 q_out  = (total % 4) + 1
-                out[f'Q{q_out} {y_out}'] = round(float(row[col]), 1)
+                if q_out == 4:   # only Q4 values for comparison table
+                    out[y_out] = round(float(row[col]), 1)
         return out
-    except:
+    except Exception as e:
+        print(f'[SPF table] {name}: {e}')
         return {}
 
-# Current and prior SPF vintages for GDP, PCE, Unemployment
-spf_gdp_curr  = _spf_annual('RGDP',   row_idx=-1)
-spf_gdp_prior = _spf_annual('RGDP',   row_idx=-2)
-spf_pce_curr  = _spf_annual('RPCE',   row_idx=-1)   # real PCE proxy
-spf_pce_prior = _spf_annual('RPCE',   row_idx=-2)
-spf_unemp_curr  = _spf_annual('UNEMP', row_idx=-1)
-spf_unemp_prior = _spf_annual('UNEMP', row_idx=-2)
+# Current and prior vintages
+spf_gdp_q4_curr   = _spf_q4('RGDP',  row_idx=-1)
+spf_gdp_q4_prior  = _spf_q4('RGDP',  row_idx=-2)
+spf_unemp_q4_curr  = _spf_q4('UNEMP', row_idx=-1, level=True)
+spf_unemp_q4_prior = _spf_q4('UNEMP', row_idx=-2, level=True)
+spf_pce_q4_curr   = _spf_q4('PCEPI', row_idx=-1)
+spf_pce_q4_prior  = _spf_q4('PCEPI', row_idx=-2)
+spf_cpi_q4_curr   = _spf_q4('CPI',   row_idx=-1)
+spf_cpi_q4_prior  = _spf_q4('CPI',   row_idx=-2)
 
-# Get the forecast years (next 2 full years from latest SPF)
-_spf_qs = list(spf_gdp_curr.keys())
-_yr1 = int(_spf_qs[0].split()[1]) if _spf_qs else TODAY.year
-_yr2 = _yr1 + 1
+# Forecast years from current vintage
+_all_yrs = sorted(set(list(spf_gdp_q4_curr.keys()) +
+                       list(spf_unemp_q4_curr.keys()) +
+                       list(spf_pce_q4_curr.keys())))
+_yr1 = _all_yrs[0] if _all_yrs else TODAY.year
+_yr2 = _all_yrs[1] if len(_all_yrs) > 1 else _yr1 + 1
+
+def _fq4(d, yr):
+    v = d.get(yr)
+    return f'{v:.1f}' if v is not None else 'n.a.'
 ```
 
 ```{python}
 #| label: overview-comparison-table
 from IPython.display import display, HTML
 
-def _fv(d, yr, default='n.a.'):
-    """Get Q4 value for a given year from SPF dict."""
-    key = f'Q4 {yr}'
-    v = d.get(key)
-    return f'{v:.1f}' if v is not None else default
-
 rows_data = [
     ('GDP (Q4/Q4 percent change)', [
-        ('Current SPF',  _fv(spf_gdp_curr, _yr1),  _fv(spf_gdp_curr, _yr2)),
-        ('Prior SPF',    _fv(spf_gdp_prior, _yr1),  _fv(spf_gdp_prior, _yr2)),
-        ('FOMC LR',      f'{fomc_lr_gdp:.1f}',      f'{fomc_lr_gdp:.1f}'),
+        ('Current SPF',  _fq4(spf_gdp_q4_curr,  _yr1), _fq4(spf_gdp_q4_curr,  _yr2)),
+        ('Prior SPF',    _fq4(spf_gdp_q4_prior, _yr1), _fq4(spf_gdp_q4_prior, _yr2)),
+        ('FOMC LR',      f'{fomc_lr_gdp:.1f}',          f'{fomc_lr_gdp:.1f}'),
     ]),
     ('Unemployment rate (Q4 level)', [
-        ('Current SPF',  _fv(spf_unemp_curr, _yr1),  _fv(spf_unemp_curr, _yr2)),
-        ('Prior SPF',    _fv(spf_unemp_prior, _yr1),  _fv(spf_unemp_prior, _yr2)),
-        ('FOMC LR',      f'{fomc_lr_unemp:.1f}',       f'{fomc_lr_unemp:.1f}'),
+        ('Current SPF',  _fq4(spf_unemp_q4_curr,  _yr1), _fq4(spf_unemp_q4_curr,  _yr2)),
+        ('Prior SPF',    _fq4(spf_unemp_q4_prior, _yr1), _fq4(spf_unemp_q4_prior, _yr2)),
+        ('FOMC LR',      f'{fomc_lr_unemp:.1f}',           f'{fomc_lr_unemp:.1f}'),
+    ]),
+    ('CPI inflation (Q4/Q4 percent change)', [
+        ('Current SPF',  _fq4(spf_cpi_q4_curr,  _yr1), _fq4(spf_cpi_q4_curr,  _yr2)),
+        ('Prior SPF',    _fq4(spf_cpi_q4_prior, _yr1), _fq4(spf_cpi_q4_prior, _yr2)),
     ]),
     ('PCE price inflation (Q4/Q4 percent change)', [
-        ('Current SPF',  _fv(spf_pce_curr, _yr1),  _fv(spf_pce_curr, _yr2)),
-        ('Prior SPF',    _fv(spf_pce_prior, _yr1),  _fv(spf_pce_prior, _yr2)),
-        ('FOMC target',  f'{fomc_lr_pce:.1f}',      f'{fomc_lr_pce:.1f}'),
+        ('Current SPF',  _fq4(spf_pce_q4_curr,  _yr1), _fq4(spf_pce_q4_curr,  _yr2)),
+        ('Prior SPF',    _fq4(spf_pce_q4_prior, _yr1), _fq4(spf_pce_q4_prior, _yr2)),
+        ('FOMC target',  f'{fomc_lr_pce:.1f}',           f'{fomc_lr_pce:.1f}'),
     ]),
 ]
 
 tbl_html = f"""
 {tbl_title('Comparison of Current and Prior SPF Forecasts')}
-<table style="width:min(70%,600px);border-collapse:collapse;
+<table style="width:min(65%,560px);border-collapse:collapse;
               font-family:'Source Sans Pro',Arial,sans-serif;font-size:0.88rem;">
   <thead>
     <tr style="background:{C1};color:white;">
-      <th style="padding:7px 12px;text-align:left;"></th>
-      <th style="padding:7px 12px;text-align:right;">{_yr1}</th>
-      <th style="padding:7px 12px;text-align:right;">{_yr2}</th>
+      <th style="padding:7px 14px;text-align:left;"></th>
+      <th style="padding:7px 12px;text-align:right;font-weight:normal;">{_yr1}</th>
+      <th style="padding:7px 12px;text-align:right;font-weight:normal;">{_yr2}</th>
     </tr>
   </thead><tbody>"""
 
 for group_label, sub_rows in rows_data:
-    tbl_html += f"""<tr><td colspan="3" style="padding:8px 12px 3px 12px;
-        font-weight:bold;font-size:0.88rem;border-top:1px solid #ccc;">
-        {group_label}</td></tr>"""
+    tbl_html += f"""<tr><td colspan="3" style="padding:8px 14px 2px 14px;
+        font-weight:bold;font-size:0.88rem;border-top:1px solid #ccc;
+        background:#f8f9fb;">{group_label}</td></tr>"""
     for i,(lbl, v1, v2) in enumerate(sub_rows):
-        bg = '#f5f7fb' if i==0 else ('white' if i==1 else '#f8fff8')
-        is_curr = (i==0)
-        fw = 'font-weight:600;' if is_curr else ''
+        bg  = 'white' if i > 0 else '#eef2fb'
+        fw  = 'font-weight:600;' if i == 0 else ''
         tbl_html += f"""<tr style="background:{bg};">
-          <td style="padding:4px 12px 4px 24px;{fw}">{lbl}</td>
+          <td style="padding:4px 14px 4px 28px;{fw}">{lbl}</td>
           <td style="padding:4px 12px;text-align:right;{fw}">{v1}</td>
           <td style="padding:4px 12px;text-align:right;{fw}">{v2}</td>
         </tr>"""
 
 tbl_html += f"""</tbody>
-  <tfoot><tr style="background:#f0f0f0;font-size:0.76rem;color:#777;">
-    <td colspan="3" style="padding:5px 12px;">
-      Source: Philadelphia Fed Survey of Professional Forecasters.
-      FOMC longer-run values from SEP. n.a. = not available.
-    </td>
-  </tr></tfoot>
-</table>"""
+  <tfoot><tr style="background:#f0f0f0;font-size:0.75rem;color:#777;">
+    <td colspan="3" style="padding:5px 14px;">
+      Source: Philadelphia Fed Survey of Professional Forecasters (SPF).
+      FOMC longer-run values from SEP. n.a. = not available in current vintage.
+    </td></tr></tfoot></table>"""
 display(HTML(tbl_html))
 ```
 
@@ -358,10 +353,10 @@ prompt = f"""Current economic conditions as of {now_str}:
 - Real GDP growth ({gdp_date}, SAAR): {gdp_latest:.1f}%; prior quarter ({gdp_prev_date}): {gdp_prev:.1f}%
 - Unemployment rate ({unrate_date}): {unrate_latest:.1f}%; natural rate: {nrou_latest:.1f}%; gap: {ugap:+.1f} pp
 - Core PCE inflation YoY ({core_date}): {core_latest:.1f}%; Fed target: {fomc_lr_pce:.1f}%
-- Average monthly payroll gains, 3-month average through {payroll_date}: {payroll_3m:,.0f}K
+- Average monthly payroll gains, 3-month avg through {payroll_date}: {payroll_3m:,.0f}K
 - 10-year Treasury yield ({t10_date}): {t10_latest:.2f}%; 10s-2s spread: {spread_10_2:+.2f} pp
-- SPF projections: GDP {spf_gdp_next}%, PCE {spf_pce_next}% (next year medians)
-- FOMC longer-run SEP: GDP {fomc_lr_gdp}%, unemployment {fomc_lr_unemp}%, PCE {fomc_lr_pce}%
+- SPF: GDP {spf_gdp_next}%, PCE {spf_pce_next}% (next year medians)
+- FOMC LR: GDP {fomc_lr_gdp}%, unemployment {fomc_lr_unemp}%, PCE {fomc_lr_pce}%
 
 Write a 2-paragraph overview. Paragraph 1: real activity and labor market.
 Paragraph 2: inflation and financial conditions.
@@ -398,7 +393,7 @@ fig2.add_hline(y=fomc_lr_unemp, line_color=C3, line_dash='dot', line_width=1,
 fig2.update_layout(**fed_layout(f'Figure {fn2} — Unemployment Rate (%)', height=320))
 fig2.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
 
-h1 = fig1.to_html(full_html=False, include_plotlyjs='cdn', config={'displayModeBar':False})
+h1 = fig1.to_html(full_html=False, include_plotlyjs='cdn',  config={'displayModeBar':False})
 h2 = fig2.to_html(full_html=False, include_plotlyjs=False, config={'displayModeBar':False})
 display(HTML(f"""
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:1.5rem;">
@@ -411,9 +406,9 @@ display(HTML(f"""
 
 fn3 = next_fig()
 fig3 = go.Figure()
-cp = core_pce[CHART_START:]
-fig3.add_trace(go.Scatter(x=cp.index, y=cp.values, name='Core PCE',
-    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig3.add_trace(go.Scatter(x=core_pce[CHART_START:].index, y=core_pce[CHART_START:].values,
+    name='Core PCE', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig3.add_trace(go.Scatter(x=pce_ov[CHART_START:].index, y=pce_ov[CHART_START:].values,
     name='Headline PCE', line=line(C2,'dash'),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
@@ -424,32 +419,30 @@ fig3.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
 
 fn4 = next_fig()
 fig4 = go.Figure()
-ur_hist = unrate[CHART_START:]
-fig4.add_trace(go.Scatter(x=ur_hist.index, y=ur_hist.values, name='Unemployment',
-    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
-
-# Add SPF forecast dots for Q4 values
-for yr, d_curr, d_prior in [(_yr1, spf_unemp_curr, spf_unemp_prior),
-                              (_yr2, spf_unemp_curr, spf_unemp_prior)]:
-    key = f'Q4 {yr}'
-    vc = d_curr.get(key)
-    vp = d_prior.get(key)
+fig4.add_trace(go.Scatter(x=unrate[CHART_START:].index, y=unrate[CHART_START:].values,
+    name='Unemployment', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+# SPF forecast dots for Q4 values
+added_legend = False
+for yr, d_curr, d_prior in [(_yr1, spf_unemp_q4_curr, spf_unemp_q4_prior),
+                              (_yr2, spf_unemp_q4_curr, spf_unemp_q4_prior)]:
+    vc = d_curr.get(yr); vp = d_prior.get(yr)
     if vc:
         fig4.add_trace(go.Scatter(
             x=[pd.Timestamp(f'{yr}-12-01')], y=[vc], mode='markers',
-            name=f'SPF {yr}', marker=dict(color=C2, size=8, symbol='circle'),
+            name='SPF forecast', marker=dict(color=C2, size=9, symbol='circle'),
             hovertemplate=f'SPF Q4/{yr}: {vc:.1f}%<extra></extra>',
-            showlegend=(yr==_yr1)))
+            showlegend=not added_legend))
+        added_legend = True
     if vp:
         fig4.add_trace(go.Scatter(
             x=[pd.Timestamp(f'{yr}-12-01')], y=[vp], mode='markers',
-            name=f'Prior SPF {yr}', marker=dict(color=C3, size=8, symbol='circle-open'),
+            name='Prior SPF', marker=dict(color=C3, size=9, symbol='circle-open'),
             hovertemplate=f'Prior SPF Q4/{yr}: {vp:.1f}%<extra></extra>',
             showlegend=(yr==_yr1)))
-
 fig4.add_hline(y=fomc_lr_unemp, line_color=C3, line_dash='dot', line_width=1,
     annotation_text=f'LR {fomc_lr_unemp}%', annotation_position='bottom right')
-fig4.update_layout(**fed_layout(f'Figure {fn4} — Unemployment: History & SPF Forecast (%)', height=320))
+fig4.update_layout(**fed_layout(f'Figure {fn4} — Unemployment: History & SPF Forecast', height=320))
 fig4.update_xaxes(range=[CHART_START, f'{_yr2+1}-01-01'])
 
 h3 = fig3.to_html(full_html=False, include_plotlyjs=False, config={'displayModeBar':False})
@@ -471,8 +464,8 @@ import io
 try:
     import requests
 except ImportError:
-    import subprocess, sys
-    subprocess.check_call([sys.executable,'-m','pip','install','requests'])
+    import subprocess, sys as _sys
+    subprocess.check_call([_sys.executable,'-m','pip','install','requests'])
     import requests
 
 SPF_BASE = ('https://www.philadelphiafed.org/-/media/FRBP/Assets/'
@@ -493,17 +486,13 @@ def pull_spf(spf_name, row_index=-1):
         if df_clean.empty or len(df_clean) < abs(row_index):
             return {}
         row  = df_clean.iloc[row_index]
-        year = int(row['YEAR'])
-        qtr  = int(row['QUARTER'])
+        year = int(row['YEAR']); qtr = int(row['QUARTER'])
         result = {}
         for h in range(2, 7):
             col = f'{prefix}{h}'
             if col in row.index and pd.notna(row[col]):
-                offset = h - 2
-                total  = (qtr - 1) + offset
-                q_year = year + total // 4
-                q_num  = (total % 4) + 1
-                result[f'Q{q_num} {q_year}'] = round(float(row[col]), 1)
+                offset = h - 2; total = (qtr-1) + offset
+                result[f'Q{(total%4)+1} {year+total//4}'] = round(float(row[col]), 1)
         return result
     except Exception as e:
         print(f'  [WARNING] SPF {spf_name}: {e}')
@@ -521,11 +510,9 @@ COMPONENTS = [
 ]
 
 def last2(ticker):
-    if ticker is None:
-        return None, None, None, None
+    if ticker is None: return None, None, None, None
     s = pull_series(ticker, start=DATA_START).dropna()
-    if len(s) < 2:
-        return None, None, None, None
+    if len(s) < 2: return None, None, None, None
     return (quarter_label(pd.Timestamp(s.index[-2])), round(float(s.iloc[-2]), 2),
             quarter_label(pd.Timestamp(s.index[-1])), round(float(s.iloc[-1]), 2))
 
@@ -541,50 +528,51 @@ def pot_for_quarter(ql):
 gdp_s       = pull_series('A191RL1Q225SBEA', start=DATA_START).dropna()
 gdp_vintage = f"BEA release through {quarter_label(pd.Timestamp(gdp_s.index[-1]))}"
 
-saar_rows    = []
-contrib_rows = []
-spf_all      = {}
-spf_prev_all = {}
+saar_rows=[]; contrib_rows=[]; spf_all={}; spf_prev_all={}
 
 for label, saar_t, contrib_t, spf_name in COMPONENTS:
-    qp, vp, qc, vc         = last2(saar_t)
-    qp_c, vp_c, qc_c, vc_c = last2(contrib_t)
+    qp,vp,qc,vc         = last2(saar_t)
+    qp_c,vp_c,qc_c,vc_c = last2(contrib_t)
     spf_d      = pull_spf(spf_name, row_index=-1)
     spf_d_prev = pull_spf(spf_name, row_index=-2)
-    spf_all[label]      = spf_d
-    spf_prev_all[label] = spf_d_prev
-    bold = (label == 'Real GDP')
-    saar_rows.append({'label': label, 'bold': bold,
-                      'q_prev': qp, 'v_prev': vp,
-                      'q_curr': qc, 'v_curr': vc,
-                      'spf': spf_d, 'spf_prev': spf_d_prev,
-                      'no_saar': saar_t is None})
-    contrib_rows.append({'label': label, 'bold': bold,
-                         'q_prev': qp_c, 'v_prev': vp_c,
-                         'q_curr': qc_c, 'v_curr': vc_c})
+    spf_all[label]=spf_d; spf_prev_all[label]=spf_d_prev
+    bold = (label=='Real GDP')
+    saar_rows.append({'label':label,'bold':bold,'q_prev':qp,'v_prev':vp,
+                      'q_curr':qc,'v_curr':vc,'spf':spf_d,'spf_prev':spf_d_prev,
+                      'no_saar':saar_t is None})
+    contrib_rows.append({'label':label,'bold':bold,'q_prev':qp_c,'v_prev':vp_c,
+                         'q_curr':qc_c,'v_curr':vc_c})
 
 gdp_row      = saar_rows[0]
-q_prev       = gdp_row['q_prev']
-q_curr       = gdp_row['q_curr']
+q_last       = gdp_row['q_prev']   # last released quarter (context only)
+q_curr       = gdp_row['q_curr']   # most recent released quarter
 spf_gdp      = spf_all['Real GDP']
 spf_gdp_prev = spf_prev_all['Real GDP']
 spf_qs       = list(spf_gdp.keys())
+gdp_last_v   = gdp_row['v_prev']
 gdp_curr_v   = gdp_row['v_curr']
-gdp_prev_v   = gdp_row['v_prev']
+
+# q_now = current quarter underway (SPF primary target), q_next = following quarter
+q_now  = spf_qs[0] if spf_qs else 'Q+1'
+q_next = spf_qs[1] if len(spf_qs)>1 else 'Q+2'
 
 def _sv(label, q):  return spf_all.get(label, {}).get(q)
 def _spv(label, q): return spf_prev_all.get(label, {}).get(q)
-def _cv(label):
+def _cv(label):     # contrib for q_curr (last released)
     r = next((x for x in contrib_rows if x['label']==label), {})
     return r.get('v_curr')
-def _av(label):
+def _av(label):     # saar growth for q_curr
     r = next((x for x in saar_rows if x['label']==label), {})
     return r.get('v_curr')
 def _f(v):  return f'{v:.1f}' if v is not None else 'n/a'
 def _fp(v): return f'{v:+.1f}' if v is not None else 'n/a'
 
-spf_q1 = spf_qs[0] if spf_qs else 'Q+1'
-spf_q2 = spf_qs[1] if len(spf_qs)>1 else 'Q+2'
+# _cv_now: for narrative prompts referring to q_now, use SPF as tracked contributions
+# (In reality we don't have realized q_now contributions yet — SPF is our best estimate)
+def _cv_now(label):
+    # Use current SPF forecast as proxy for q_now tracked contribution
+    v = _sv(label, q_now)
+    return v  # may be None for inventories/net exports
 
 gdp_lvl   = pull_series('GDPC1',  start=DATA_START).dropna()
 pot_lvl   = pull_series('GDPPOT', start=DATA_START).dropna()
@@ -592,6 +580,21 @@ pot_align = pot_lvl.reindex(gdp_lvl.index, method='ffill')
 og_series = ((gdp_lvl - pot_align) / pot_align * 100).dropna()
 og_latest = round(float(og_series.iloc[-1]), 2)
 og_date   = quarter_label(pd.Timestamp(og_series.index[-1]))
+
+# Private domestic final purchases for q_now (sum of tracked SPF contributions)
+pdfp_now = sum(filter(None, [
+    _sv('PCE', q_now),
+    _sv('Nonres. fixed investment', q_now),
+    _sv('Residential investment', q_now),
+])) or 0.0
+
+# Driver summary for Beige Book prompt
+_drivers = []
+for lbl in ['PCE','Nonres. fixed investment','Residential investment','Federal government']:
+    v = _sv(lbl, q_now)
+    if v is not None:
+        _drivers.append(f'{lbl}: {v:+.1f}%')
+driver_summary = '; '.join(_drivers) if _drivers else 'SPF forecasts unavailable'
 ```
 
 ```{python}
@@ -607,186 +610,179 @@ def fetch_beige_book():
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         now = datetime.today()
         for m in range(12):
-            dt     = now - relativedelta(months=m)
+            dt = now - relativedelta(months=m)
             yyyymm = dt.strftime('%Y%m')
-            url    = f"https://www.federalreserve.gov/monetarypolicy/beigebook{yyyymm}-summary.htm"
+            url = f"https://www.federalreserve.gov/monetarypolicy/beigebook{yyyymm}-summary.htm"
             for verify in [True, False]:
                 try:
                     r = requests.get(url, headers=headers, timeout=15, verify=verify)
                     if r.status_code == 404: break
                     if r.status_code != 200: continue
-                    text  = re.sub(r'<[^>]+>', ' ', r.text)
-                    text  = re.sub(r'\s+', ' ', text).strip()
-                    start = re.search(r'Economic activity', text, re.IGNORECASE)
-                    end   = re.search(r'Federal Reserve Bank of Boston', text, re.IGNORECASE)
-                    if start and end and end.start() > start.start():
+                    text  = re.sub(r'<[^>]+>',' ',r.text)
+                    text  = re.sub(r'\s+',' ',text).strip()
+                    start = re.search(r'Economic activity',text,re.IGNORECASE)
+                    end   = re.search(r'Federal Reserve Bank of Boston',text,re.IGNORECASE)
+                    if start and end and end.start()>start.start():
                         summary = text[start.start():end.start()].strip()
                     elif start:
                         summary = text[start.start():start.start()+2000].strip()
                     else: break
-                    if len(summary) < 100: break
-                    if len(summary) > 2000: summary = summary[:2000] + '...'
-                    date_match = re.search(
-                        r'(January|February|March|April|May|June|July|August|'
-                        r'September|October|November|December)\s+\d{1,2},?\s+\d{4}', text)
-                    bb_date = date_match.group(0) if date_match else dt.strftime('%B %Y')
+                    if len(summary)<100: break
+                    if len(summary)>2000: summary=summary[:2000]+'...'
+                    dm = re.search(r'(January|February|March|April|May|June|July|August|'
+                                   r'September|October|November|December)\s+\d{1,2},?\s+\d{4}',text)
+                    bb_date = dm.group(0) if dm else dt.strftime('%B %Y')
                     BEIGE_BOOK_CACHE.parent.mkdir(parents=True, exist_ok=True)
-                    BEIGE_BOOK_CACHE.write_text(f'{bb_date}\n{summary}', encoding='utf-8')
+                    BEIGE_BOOK_CACHE.write_text(f'{bb_date}\n{summary}',encoding='utf-8')
                     print(f'[Beige Book] Fetched: {bb_date}')
                     return summary, bb_date
                 except requests.exceptions.SSLError:
-                    if verify:
-                        urllib3.disable_warnings()
-                        continue
+                    if verify: urllib3.disable_warnings(); continue
                     break
                 except Exception as e:
-                    print(f'[Beige Book] {yyyymm} verify={verify}: {e}')
-                    break
+                    print(f'[BB] {yyyymm}: {e}'); break
         if BEIGE_BOOK_CACHE.exists():
-            lines = BEIGE_BOOK_CACHE.read_text(encoding='utf-8').split('\n', 1)
-            if len(lines) == 2 and len(lines[1]) > 100:
-                print(f'[Beige Book] Loaded from cache: {lines[0]}')
+            lines = BEIGE_BOOK_CACHE.read_text(encoding='utf-8').split('\n',1)
+            if len(lines)==2 and len(lines[1])>100:
+                print(f'[Beige Book] From cache: {lines[0]}')
                 return lines[1].strip(), lines[0].strip()
-        print('[WARNING] Beige Book unavailable')
-        return None, None
+        print('[WARNING] Beige Book unavailable'); return None,None
     except Exception as e:
-        print(f'[WARNING] Beige Book fetch failed: {e}')
-        return None, None
+        print(f'[WARNING] Beige Book failed: {e}'); return None,None
 
 beige_text, beige_date = fetch_beige_book()
 ```
 
 ```{python}
-#| label: gdp-narrative-1-recent
+#| label: gdp-narrative-1
 #| output: asis
 
-pdfp = (_cv('PCE') or 0) + (_cv('Nonres. fixed investment') or 0) + (_cv('Residential investment') or 0)
+pdfp_now_str = f'{pdfp_now:+.1f}' if pdfp_now else 'n/a'
 
-# Beige Book is current-quarter context — label explicitly so model doesn't confuse periods
-bb_fwd = (f"\n\nBEIGE BOOK CONTEXT — reflects {spf_q1} conditions, NOT {q_curr} GDP release "
-          f"({beige_date}):\n{beige_text[:600]}") if beige_text else ""
-
-prompt_1 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person, precise. No hedging. Every sentence names its exact time period
-and a specific numerical value. Flowing prose — no bullet points, no headers.
-Complete every sentence fully. Do not invent facts beyond what is provided.
-
-IMPORTANT TEMPORAL STRUCTURE:
-- {q_curr} = most recently RELEASED GDP quarter (backward-looking, realized data)
-- {spf_q1} = CURRENT quarter underway (not yet released; Beige Book period)
-The Beige Book reflects {spf_q1} conditions, NOT {q_curr}.
-
-REALIZED DATA ({q_curr}):
-Real GDP: {_f(gdp_curr_v)}% SAAR | prior quarter {q_prev}: {_f(gdp_prev_v)}% SAAR
-Private domestic final purchases: {pdfp:+.1f} pp (PCE + nonres. + residential contributions)
-{bb_fwd}
-
-TASK — Write exactly 1 paragraph (3 sentences):
-1. State the headline GDP growth rate in {q_curr} and whether it accelerated or
-   decelerated relative to {q_prev}, noting the exact magnitude of the change.
-2. State whether private domestic final purchases confirm or diverge from the
-   headline, using it as a signal of underlying momentum in {q_curr}.
-3. If Beige Book is provided, note ONE observation about {spf_q1} conditions
-   that either supports continuity with or signals a shift from the {q_curr} trend.
-   Explicitly reference {spf_q1} as the period and use qualified language."""
-
-print(call_claude(prompt_1, max_tokens=280))
+prompt_1 = f"""
+You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
+ANCHORING RULE:
+- The main object is GDP growth in {q_now}, which has not yet been released.
+- Use {q_curr} only as context — do not write a retrospective paragraph about it.
+Style:
+- Declarative, precise, third person.
+- Write one coherent paragraph with complete sentences.
+- Use numerical values where most informative.
+- Use cautious causal language (e.g., "consistent with", "suggesting", "likely reflecting").
+DATA:
+SPF median GDP forecast:
+- {q_now}: {_f(spf_gdp.get(q_now))}%
+- {q_next}: {_f(spf_gdp.get(q_next))}%
+Realized GDP (context only):
+- {q_curr}: {_f(gdp_curr_v)}%
+Tracked SPF contributions for {q_now} (pp):
+- PCE: {_f(_sv('PCE', q_now))}
+- Nonresidential investment: {_f(_sv('Nonres. fixed investment', q_now))}
+- Residential investment: {_f(_sv('Residential investment', q_now))}
+- Government (federal SPF): {_f(_sv('Federal government', q_now))}
+Private domestic final purchases ({q_now}): {pdfp_now_str} pp
+TASK:
+Write exactly 1 paragraph (4 sentences):
+1. State the SPF-based estimate for GDP growth in {q_now} and compare it to realized GDP in {q_curr}.
+2. Indicate whether underlying momentum in {q_now} appears stronger or weaker than headline GDP using private domestic final purchases.
+3. Identify the main sources of support or drag in the {q_now} estimate.
+4. State the SPF forecast for {q_next} and whether it implies firming or moderation relative to {q_now}.
+"""
+print(call_claude(prompt_1, max_tokens=320))
 ```
 
 ```{python}
-#| label: gdp-narrative-2-components
+#| label: gdp-narrative-2
 #| output: asis
 
-prompt_2 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person. Every sentence names its exact time period and a specific value.
-Two bullet paragraphs beginning with •. Complete every sentence fully — never truncate.
-
-COMPONENT CONTRIBUTIONS TO {q_curr} GDP GROWTH (realized, percentage points):
-  PCE:                   {_fp(_cv('PCE'))} pp  |  PCE SAAR: {_f(_av('PCE'))}%
-  Nonres. fixed inv.:    {_fp(_cv('Nonres. fixed investment'))} pp  |  SAAR: {_f(_av('Nonres. fixed investment'))}%
-  Residential inv.:      {_fp(_cv('Residential investment'))} pp  |  SAAR: {_f(_av('Residential investment'))}%
-  Federal government:    {_fp(_cv('Federal government'))} pp  |  SAAR: {_f(_av('Federal government'))}%
-  State & local govt:    {_fp(_cv('State & local govt'))} pp  |  SAAR: {_f(_av('State & local govt'))}%
-  Change in inventories: {_fp(_cv('Change in inventories'))} pp
-  Net exports:           {_fp(_cv('Net exports'))} pp
-All data pertain to {q_curr}.
-
-• Bullet 1 (Spending components): Name the two largest positive contributors to {q_curr}
-  GDP growth with pp values. Name the largest drag. Note whether consumer spending
-  and business investment moved in the same direction in {q_curr}.
-
-• Bullet 2 (Inventories and trade): State the inventory and net export contributions
-  in {q_curr}. Note whether their combined swing distorts the headline relative to
-  underlying final demand. Flag either component if unusually large (beyond ±0.5 pp)
-  and interpret as likely transitory or structural."""
-
+prompt_2 = f"""
+You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
+ANCHORING RULE:
+- Describe the expected composition of GDP growth in {q_now}, not the realized breakdown of {q_curr}.
+Style:
+- Declarative, precise, third person.
+- Write 2 short paragraphs (no bullets).
+- Use numerical values where most informative.
+TRACKED CONTRIBUTIONS TO {q_now} GDP (pp, from SPF):
+- PCE: {_f(_sv('PCE', q_now))}
+- Nonresidential investment: {_f(_sv('Nonres. fixed investment', q_now))}
+- Residential investment: {_f(_sv('Residential investment', q_now))}
+- Federal government: {_f(_sv('Federal government', q_now))}
+- State & local government: {_f(_sv('State & local govt', q_now))}
+- Inventories ({q_curr} realized): {_fp(_cv('Change in inventories'))}
+- Net exports ({q_curr} realized): {_fp(_cv('Net exports'))}
+TASK:
+Paragraph 1:
+Describe the main drivers of GDP growth in {q_now}, focusing on consumption and investment.
+Paragraph 2:
+Explain the role of inventories and net exports in {q_now}, and whether they materially distort headline GDP relative to underlying demand.
+"""
 print(call_claude(prompt_2, max_tokens=320))
 ```
 
 ```{python}
-#| label: gdp-narrative-3-pce-housing
+#| label: gdp-narrative-3
 #| output: asis
 
-prompt_3 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person. Every sentence names its exact time period and value.
-Two bullet paragraphs beginning with •. Complete every sentence fully.
-Forward-looking language: 'is projected to', 'is expected to', 'appears on track to'.
-
-IMPORTANT: {q_curr} = realized. {spf_q1}, {spf_q2} = projections not yet released.
-
-PCE ({q_curr}): contribution {_fp(_cv('PCE'))} pp | SAAR: {_f(_av('PCE'))}%
-PCE SPF current:  {', '.join(f'{q}: {_f(_sv("PCE",q))}%' for q in spf_qs)}
-PCE SPF prior:    {', '.join(f'{q}: {_f(_spv("PCE",q))}%' for q in spf_qs if _spv("PCE",q) is not None)}
-
-Residential inv. ({q_curr}): {_f(_av('Residential investment'))}% SAAR | contribution: {_fp(_cv('Residential investment'))} pp
-Residential SPF:  {', '.join(f'{q}: {_f(_sv("Residential investment",q))}%' for q in spf_qs)}
-
-• Consumer spending: State PCE growth in {q_curr} and its pp contribution. Compare to
-  the prior quarter's pace, noting acceleration or deceleration. Provide one economic
-  mechanism linking labor market or financial conditions to the {q_curr} outcome.
-  State the SPF projection for {spf_q1} and whether it represents a revision up or
-  down from the prior vintage, citing both values.
-
-• Residential investment: State the growth rate and pp contribution in {q_curr}.
-  Characterize housing activity as recovering, contracting, or stable relative to
-  recent quarters. Name the primary driver (mortgage rates, affordability, or demand).
-  State the SPF near-term trajectory for {spf_q1}."""
-
+prompt_3 = f"""
+You are a Federal Reserve staff economist writing Tealbook A.
+ANCHORING RULE:
+- Focus on expected developments in {q_now} and {q_next}.
+- Use {q_curr} only as context.
+Style:
+- Declarative, precise, third person.
+- Write 2 short paragraphs.
+- Use forward-looking language ("is projected to", "appears on track to").
+DATA:
+PCE:
+- SPF: {q_now}: {_f(_sv('PCE', q_now))}%, {q_next}: {_f(_sv('PCE', q_next))}%
+- Prior SPF: {q_now}: {_f(_spv('PCE', q_now))}%
+- Latest realized ({q_curr}): {_f(_av('PCE'))}%
+Residential investment:
+- SPF: {q_now}: {_f(_sv('Residential investment', q_now))}%, {q_next}: {_f(_sv('Residential investment', q_next))}%
+- Prior SPF: {q_now}: {_f(_spv('Residential investment', q_now))}%
+- Latest realized ({q_curr}): {_f(_av('Residential investment'))}%
+TASK:
+Paragraph 1:
+Describe the outlook for consumer spending in {q_now} and {q_next}, using {q_curr} only to characterize recent momentum.
+Note whether the SPF was revised up or down relative to the prior vintage.
+Paragraph 2:
+Describe the outlook for residential investment in {q_now} and {q_next}, noting whether activity appears to be stabilizing or continuing to contract.
+"""
 print(call_claude(prompt_3, max_tokens=340))
 ```
 
 ```{python}
-#| label: gdp-narrative-4-bfi-trade
+#| label: gdp-narrative-4
 #| output: asis
 
-prompt_4 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person. Every sentence names its exact time period and value.
-Three bullet paragraphs beginning with •. Complete every sentence fully.
-IMPORTANT: {q_curr} = realized. {spf_q1} = current quarter projection.
-
-Nonres. fixed inv. ({q_curr}): {_f(_av('Nonres. fixed investment'))}% SAAR | contribution: {_fp(_cv('Nonres. fixed investment'))} pp
-BFI SPF: {', '.join(f'{q}: {_f(_sv("Nonres. fixed investment",q))}%' for q in spf_qs)}
-Federal govt ({q_curr}): {_f(_av('Federal government'))}% SAAR | contribution: {_fp(_cv('Federal government'))} pp
-State & local ({q_curr}): {_f(_av('State & local govt'))}% SAAR | contribution: {_fp(_cv('State & local govt'))} pp
-Inventories ({q_curr}): {_fp(_cv('Change in inventories'))} pp
-Net exports ({q_curr}): {_fp(_cv('Net exports'))} pp
-
-• Business fixed investment: State growth and contribution in {q_curr}. Note
-  acceleration or deceleration from the prior quarter. Provide one economic mechanism
-  (financing conditions, profits, policy uncertainty). State the SPF projection
-  for {spf_q1} and whether investment is expected to strengthen or moderate.
-
-• Government spending: State the combined federal and state/local contribution in
-  {q_curr}. Characterize the fiscal impulse as expansionary, contractionary, or
-  neutral. Note whether the federal component is likely to reverse or persist
-  into {spf_q1}, given the direction of the {q_curr} reading.
-
-• Net exports and inventories: State both contributions in {q_curr} with their
-  pp values. Note whether they jointly boosted or dragged headline growth. If
-  inventories are large in magnitude, interpret as likely transitory. Conclude
-  with whether underlying final demand appears stronger or weaker than headline GDP
-  after removing these volatile components."""
-
+prompt_4 = f"""
+You are a Federal Reserve staff economist writing Tealbook A.
+ANCHORING RULE:
+- Focus on expected contributions in {q_now}.
+- Do not write a backward-looking decomposition of {q_curr}.
+Style:
+- Declarative, precise, third person.
+- Write 3 short paragraphs (no bullets).
+DATA:
+Nonresidential investment:
+- SPF: {q_now}: {_f(_sv('Nonres. fixed investment', q_now))}%, {q_next}: {_f(_sv('Nonres. fixed investment', q_next))}%
+- Prior SPF {q_now}: {_f(_spv('Nonres. fixed investment', q_now))}%
+Government:
+- Federal contribution ({q_now} SPF): {_f(_sv('Federal government', q_now))}%
+- State & local ({q_now} SPF): {_f(_sv('State & local govt', q_now))}%
+- Federal realized ({q_curr}): {_fp(_cv('Federal government'))} pp
+External:
+- Inventories ({q_curr} realized): {_fp(_cv('Change in inventories'))} pp
+- Net exports ({q_curr} realized): {_fp(_cv('Net exports'))} pp
+TASK:
+Paragraph 1:
+Describe the outlook for business fixed investment in {q_now} and {q_next}, noting whether it is expected to strengthen or weaken relative to {q_curr}.
+Paragraph 2:
+Describe the contribution of government spending in {q_now} and whether it represents a positive or negative impulse to growth.
+Paragraph 3:
+Explain the role of inventories and net exports in {q_now}, noting whether they are likely to temporarily distort headline GDP relative to underlying demand.
+"""
 print(call_claude(prompt_4, max_tokens=420))
 ```
 
@@ -796,54 +792,50 @@ print(call_claude(prompt_4, max_tokens=420))
 from IPython.display import display, HTML
 
 def signed(v, bold=False):
-    if v is None or (isinstance(v, float) and np.isnan(v)):
+    if v is None or (isinstance(v,float) and np.isnan(v)):
         return '<span style="color:#ccc">—</span>'
-    color = C1 if v > 0 else (C2 if v < 0 else '#333')
+    color = C1 if v>0 else (C2 if v<0 else '#333')
     s = f'{v:+.1f}'
     return (f'<strong style="color:{color}">{s}</strong>'
             if bold else f'<span style="color:{color}">{s}</span>')
 
 def plain(v, bold=False):
-    if v is None or (isinstance(v, float) and np.isnan(v)):
+    if v is None or (isinstance(v,float) and np.isnan(v)):
         return '<span style="color:#ccc">—</span>'
     s = f'{v:.1f}'
     return f'<strong>{s}</strong>' if bold else s
 
-all_q_labels = [q_prev, q_curr] + spf_qs
+all_q_labels = [q_last, q_curr] + spf_qs
 hdrs    = ['Measure'] + all_q_labels
-act_set = {q_prev, q_curr}
+act_set = {q_last, q_curr}
 
 header_cells = ''.join(
     f'<th style="padding:7px 10px;text-align:{"left" if i==0 else "center"};'
     f'white-space:nowrap;'
     f'{"background:#003087;" if ql in act_set or i==0 else "background:#1a5276;"}'
     f'color:white;font-size:0.82rem;">'
-    f'{"Measure" if i==0 else (ql if ql in act_set else ql + "f")}</th>'
-    for i, ql in enumerate(hdrs)
+    f'{"Measure" if i==0 else (ql if ql in act_set else ql+"f")}</th>'
+    for i,ql in enumerate(hdrs)
 )
 
 rows_html = ''
 for r in saar_rows:
-    if r['no_saar']:
-        continue
-    b   = r['bold']
-    bg  = '#eef2fb' if b else 'white'
-    ind = '' if b else '&nbsp;&nbsp;&nbsp;'
-    lbl = f'<strong>{r["label"]}</strong>' if b else f'{ind}{r["label"]}'
-
+    if r['no_saar']: continue
+    b  = r['bold']
+    bg = '#eef2fb' if b else 'white'
+    lbl = f'<strong>{r["label"]}</strong>' if b else f'&nbsp;&nbsp;&nbsp;{r["label"]}'
     cells = (f'<td style="padding:5px 10px;text-align:left;'
              f'border-bottom:none;font-size:0.87rem;">{lbl}</td>')
     for ql in all_q_labels:
-        if ql == q_prev:   v = r['v_prev']
-        elif ql == q_curr: v = r['v_curr']
-        else:              v = r['spf'].get(ql)
+        if ql==q_last:   v=r['v_prev']
+        elif ql==q_curr: v=r['v_curr']
+        else:            v=r['spf'].get(ql)
         is_fcast = ql not in act_set
-        fmt_v    = plain(v, b)
+        fmt_v    = plain(v,b)
         c_style  = 'color:#1a5276;' if is_fcast and v is not None else ''
         cells += (f'<td style="padding:5px 10px;text-align:center;'
                   f'border-bottom:none;font-size:0.87rem;{c_style}">{fmt_v}</td>')
     rows_html += f'<tr style="background:{bg};">{cells}</tr>'
-
     if not b:
         sub = (f'<td style="padding:1px 10px 5px 20px;text-align:left;'
                f'border-bottom:1px solid #eee;font-size:0.78rem;color:#888;'
@@ -859,24 +851,21 @@ for r in saar_rows:
                         f'border-bottom:1px solid #eee;font-size:0.78rem;color:#ccc;">—</td>')
         rows_html += f'<tr style="background:{bg};">{sub}</tr>'
 
-# Contributions separator
 rows_html += f"""<tr style="background:#f0f4ff;">
   <td colspan="{len(hdrs)}" style="padding:6px 10px;font-size:0.78rem;
      font-weight:bold;color:#555;border-top:2px solid #ccc;border-bottom:1px solid #eee;">
      Contributions (pp) — inventories &amp; net exports (no SPF available)
   </td></tr>"""
-
 for r in saar_rows:
-    if not r['no_saar']:
-        continue
-    cr  = next((x for x in contrib_rows if x['label'] == r['label']), {})
+    if not r['no_saar']: continue
+    cr  = next((x for x in contrib_rows if x['label']==r['label']),{})
     lbl = f'&nbsp;&nbsp;&nbsp;{r["label"]}'
     cells = (f'<td style="padding:5px 10px;text-align:left;'
              f'border-bottom:1px solid #eee;font-size:0.87rem;">{lbl}</td>')
     for ql in all_q_labels:
-        if ql == q_prev:   v = cr.get('v_prev')
-        elif ql == q_curr: v = cr.get('v_curr')
-        else:              v = None
+        if ql==q_last:   v=cr.get('v_prev')
+        elif ql==q_curr: v=cr.get('v_curr')
+        else:            v=None
         fmt_v = signed(v) if v is not None else '<span style="color:#ccc">—</span>'
         cells += (f'<td style="padding:5px 10px;text-align:center;'
                   f'border-bottom:1px solid #eee;font-size:0.87rem;">{fmt_v}</td>')
@@ -894,131 +883,70 @@ rows_html += f'<tr style="background:#f8f9ff;">{pot_cells}</tr>'
 
 display(HTML(f"""
 {tbl_title('Real GDP Components — Percent Change at Annual Rate (SAAR)')}
-<table style="width:min(95%, 960px);border-collapse:collapse;
+<table style="width:min(95%,960px);border-collapse:collapse;
               font-family:'Source Sans Pro',Arial,sans-serif;">
   <thead><tr>{header_cells}</tr></thead>
   <tbody>{rows_html}</tbody>
 </table>
 <p style="font-size:0.75rem;color:#888;margin:4px 0 1.2rem 0;">
   Source: Actuals from BEA ({gdp_vintage}); Forecasts from Philadelphia Fed SPF median (columns marked <em>f</em>).<br>
-  <em>Prior forecast</em> sub-rows show previous quarter's SPF vintage for the same horizon.
-  Inventories and net exports shown as contributions (pp); no SPF published for these components.
+  <em>Prior forecast</em> sub-rows show previous quarter's SPF vintage.
+  Inventories and net exports shown as contributions (pp); no SPF published for these.
   Italicized row: CBO potential GDP growth rate (GDPPOT).
 </p>"""))
 ```
 
 ```{python}
-#| label: gdp-narrative-5-nearterm
+#| label: gdp-narrative-5
 #| output: asis
 
-spf_lines = '\n'.join(
-    f'  {q}: GDP {_f(spf_gdp.get(q))}% | PCE {_f(_sv("PCE",q))}% | '
-    f'Nonres. {_f(_sv("Nonres. fixed investment",q))}% | Res. {_f(_sv("Residential investment",q))}%'
-    for q in spf_qs
-) or '  SPF data unavailable'
-
-spf_prev_lines = '\n'.join(
-    f'  {q}: GDP {_f(spf_gdp_prev.get(q))}%'
-    for q in spf_qs if spf_gdp_prev.get(q) is not None
-) or '  Prior SPF unavailable'
-
-bb_nearterm = (f"\nBEIGE BOOK — {spf_q1} current conditions ({beige_date}):\n{beige_text[:800]}") if beige_text else ""
-
-prompt_5 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person. Every sentence names its exact time period and value.
-Complete every sentence fully. Forward-looking: 'is projected to', 'appears on track to'.
-
-IMPORTANT:
-- {q_curr} = last RELEASED quarter (baseline only)
-- {spf_q1} = CURRENT quarter underway (PRIMARY focus of this paragraph)
-- {spf_q2} and beyond = near-term outlook
-- Beige Book describes {spf_q1} conditions — this is your main forward-looking evidence.
-
-BASELINE ({q_curr}, realized): GDP {_f(gdp_curr_v)}%
-SPF PROJECTIONS (primary subject — not yet released):
-{spf_lines}
-PRIOR SPF VINTAGE (revision context):
-{spf_prev_lines}
-Potential GDP growth: {_f(pot_for_quarter(q_curr))}%
-{bb_nearterm}
-
-TASK — Write exactly 1 paragraph (4 sentences). Primary focus is {spf_q1}:
-1. State what the SPF median projects for {spf_q1} GDP growth and characterize
-   it as acceleration or deceleration from {q_curr}'s realized rate of {_f(gdp_curr_v)}%.
-2. State whether the current SPF is an upward or downward revision from the prior
-   vintage for {spf_q1}, citing both values explicitly.
-3. Identify which component (PCE, nonres. fixed investment, or residential) is the
-   primary driver of the {spf_q1} projection and state its projected rate.
-4. If Beige Book is available, integrate one specific {spf_q1} observation that
-   supports or complicates the projection; name {spf_q1} explicitly and use
-   qualified language ('consistent with', 'may pose a risk to')."""
-
-print(call_claude(prompt_5, max_tokens=350))
-```
-
-```{python}
-#| label: gdp-narrative-6-medterm
-#| output: asis
-
-prompt_6 = f"""You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
-Style: declarative, third person. Every sentence names its exact time period and value.
-Complete every sentence fully. Forward-looking: 'is projected to', 'is expected to'.
+prompt_5 = f"""
+You are a Federal Reserve staff economist writing Tealbook A.
+ANCHORING RULE:
+- Focus on the medium-term path for GDP growth.
+- Use {q_curr} only as baseline context.
+Style: declarative, precise, third person. Complete all sentences.
 
 Output gap ({og_date}): {og_latest:+.2f}% of potential GDP (CBO)
-Potential GDP growth: {_f(pot_for_quarter(q_curr))}% (annualized)
+Potential GDP growth: {_f(pot_for_quarter(q_curr))}%
 FOMC longer-run real GDP: {fomc_lr_gdp}%
 Latest actual GDP ({q_curr}): {_f(gdp_curr_v)}%
 SPF forecasts: {' | '.join(f'{q}: {_f(spf_gdp.get(q))}%' for q in spf_qs)}
 
 TASK — Write exactly 1 paragraph (3 complete sentences):
-1. State the output gap as of {og_date} and characterize whether the economy
-   is operating above or below potential and by how much.
-2. Compare the SPF growth trajectory to both the CBO potential growth rate and the
-   FOMC longer-run rate of {fomc_lr_gdp}%, noting the implied direction of the output gap.
-3. Name one specific upside risk and one specific downside risk to convergence
-   toward potential, each tied to a named GDP component — not generic statements."""
-
-print(call_claude(prompt_6, max_tokens=260))
+1. State the output gap as of {og_date} and characterize whether the economy is operating above or below potential.
+2. Compare the SPF growth trajectory to both the CBO potential growth rate and the FOMC longer-run rate of {fomc_lr_gdp}%, noting the implied direction of the output gap.
+3. Name one specific upside risk and one specific downside risk to convergence toward potential, each tied to a named GDP component.
+"""
+print(call_claude(prompt_5, max_tokens=260))
 ```
 
 ```{python}
-#| label: gdp-narrative-7-context
+#| label: gdp-narrative-6-bb
 #| output: asis
 
 if not beige_text:
-    print('*[Beige Book unavailable — contextual narrative skipped for this cycle.]*')
+    print('*[Beige Book unavailable — contextual note skipped.]*')
 else:
-    prompt_7 = f"""You are a Federal Reserve staff economist writing Tealbook A.
-Style: declarative, third person. Qualified causal language: "consistent with",
-"likely reflecting", "in part attributable to", "appeared to weigh on".
-Do not invent facts. Do not use generic themes. Flowing prose — no bullet points.
-Complete every sentence fully.
-
-BEIGE BOOK NATIONAL SUMMARY ({beige_date}) — reflects {spf_q1} current conditions:
-{beige_text}
-
-GDP OUTCOMES ({q_curr}, most recent release):
-Real GDP: {_f(gdp_curr_v)}% | PCE: {_fp(_cv('PCE'))} pp
-Nonres. fixed inv.: {_fp(_cv('Nonres. fixed investment'))} pp
-Residential inv.: {_fp(_cv('Residential investment'))} pp
-Federal govt: {_fp(_cv('Federal government'))} pp
-Inventories: {_fp(_cv('Change in inventories'))} pp | Net exports: {_fp(_cv('Net exports'))} pp
-Output gap ({og_date}): {og_latest:+.2f}%
-
-SPF projection for {spf_q1}: {_f(_sv('Real GDP', spf_q1))}%
-
-TASK — Write exactly 3 sentences (4 if divergence requires explanation):
-1. Identify the single most prominent theme in the Beige Book based on emphasis
-   or repeated mentions; state which GDP component(s) from {q_curr} it most directly
-   relates to, or explicitly note any divergence between the Beige Book ({spf_q1})
-   and the GDP outcome ({q_curr}).
-2. Explain the transmission channel using cautious language, referencing at least
-   one specific numerical GDP contribution from {q_curr}.
-3. Assess whether this theme is likely to affect the {spf_q1} projection of
-   {_f(_sv('Real GDP', spf_q1))}%, using qualified language and naming {spf_q1}."""
-
-    print('\n**Current Conditions Context**\n')
-    print(call_claude(prompt_7, max_tokens=300))
+    prompt_bb = f"""
+You are adding one optional qualitative sentence to a Tealbook A paragraph.
+RULES:
+- Use the Beige Book only for {q_now}.
+- Do not use it to describe {q_curr}.
+- Do not infer numerical magnitudes.
+- If no clear alignment exists, return exactly: OMIT
+GDP outlook ({q_now}): {_f(spf_gdp.get(q_now))}%
+Main drivers: {driver_summary}
+Beige Book ({beige_date}):
+{beige_text[:1200]}
+TASK:
+Write exactly one sentence linking a concrete qualitative theme from the Beige Book
+to the GDP outlook for {q_now}, using cautious language
+("consistent with", "suggesting", "may weigh on", "appears to support").
+"""
+    result = call_claude(prompt_bb, max_tokens=120).strip()
+    if result.upper() != 'OMIT':
+        print(f'\n*{result}*\n')
 ```
 
 ```{python}
@@ -1049,7 +977,7 @@ show(fig, 'Source: BEA (GDPC1, A261RX1Q020SBEA) via FRED')
 #| label: plot-gdp-2
 
 mfg_raw = pull_series('IPXXX001S', start=DATA_START).dropna()
-mfg_3m  = (((mfg_raw / mfg_raw.shift(3)) ** 4) - 1).mul(100).dropna()[CHART_START_GDP:]
+mfg_3m  = (((mfg_raw/mfg_raw.shift(3))**4)-1).mul(100).dropna()[CHART_START_GDP:]
 
 fn = next_fig()
 fig = go.Figure()
@@ -1088,12 +1016,12 @@ show(fig, "Source: BEA (ALTSALES) and FRB (MVAAUTLTTS) via FRED")
 #| label: plot-gdp-4
 
 pce_m  = pull_series('PCEC96', start=DATA_START).dropna()
-pce_6m = (((pce_m / pce_m.shift(6)) ** 2) - 1).mul(100).dropna()[CHART_START_GDP:]
+pce_6m = (((pce_m/pce_m.shift(6))**2)-1).mul(100).dropna()[CHART_START_GDP:]
 
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=pce_6m.index, y=pce_6m.values, mode='lines',
-    name='Real PCE', line=line(C4),
+    name='Real PCE', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
 fig.add_hline(y=0, line_color='black', line_width=0.8)
 fig.update_layout(**base_layout(f'Figure {fn} — Real PCE Growth',
@@ -1154,8 +1082,8 @@ show(fig, 'Source: NAR (EXHOSLUSM495S) and Census (HSN1F) via FRED.', flush=True
 ```{python}
 #| label: plot-gdp-7
 
-cap_o = (pull_series('NEWORDER', start=DATA_START).dropna().rolling(3).mean() / 1000)[CHART_START_GDP:]
-cap_s = (pull_series('ANXAVS',   start=DATA_START).dropna().rolling(3).mean() / 1000)[CHART_START_GDP:]
+cap_o = (pull_series('NEWORDER', start=DATA_START).dropna().rolling(3).mean()/1000)[CHART_START_GDP:]
+cap_s = (pull_series('ANXAVS',   start=DATA_START).dropna().rolling(3).mean()/1000)[CHART_START_GDP:]
 
 fn = next_fig()
 fig = go.Figure()
@@ -1174,7 +1102,7 @@ show(fig, 'Note: Data are 3-month moving averages.<br>Source: Census (NEWORDER, 
 ```{python}
 #| label: plot-gdp-8
 
-nrc = (pull_series('TLNRESCONS', start=DATA_START).dropna() / 1000)[CHART_START_GDP:]
+nrc = (pull_series('TLNRESCONS', start=DATA_START).dropna()/1000)[CHART_START_GDP:]
 
 fn = next_fig()
 fig = go.Figure()
@@ -1241,7 +1169,6 @@ unrate     = pull_series('UNRATE',        start=DATA_START).dropna()
 nrou       = pull_series('NROU',          start=DATA_START).dropna().resample('MS').interpolate()
 lfpr       = pull_series('CIVPART',       start=DATA_START).dropna()
 epop25     = pull_series('LNS12300060',   start=DATA_START).dropna()
-u5         = pull_series('U5RATE',        start=DATA_START).dropna()
 ahe        = pull_series('CES0500000003', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 jolts_o    = pull_series('JTSJOR',        start=DATA_START).dropna().rolling(3).mean()
 jolts_q    = pull_series('JTSQUR',        start=DATA_START).dropna().rolling(3).mean()
@@ -1336,10 +1263,9 @@ for s, name, color, dash in [
 ]:
     s2 = s[CHART_START:].dropna()
     fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color, dash), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=1)
+        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=1)
 
-lf = lfpr[CHART_START:]
-ep = epop25[CHART_START:]
+lf = lfpr[CHART_START:]; ep = epop25[CHART_START:]
 fig.add_trace(go.Scatter(x=lf.index, y=lf.values, name='LFPR (total)',
     line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=2)
 fig.add_trace(go.Scatter(x=ep.index, y=ep.values, name='E-Pop 25-54',
@@ -1368,7 +1294,6 @@ core_pce = pull_series('PCEPILFE',             start=DATA_START).dropna().pct_ch
 trim_pce = pull_series('PCETRIM12M159SFRBDAL', start=DATA_START).dropna()
 mkt_pce  = pull_series('DPCXRG3M086SBEA',      start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 eci      = pull_series('ECIWAG',               start=DATA_START).dropna().pct_change(4).mul(100).dropna()
-ahe_inf  = pull_series('CES0500000003',        start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 tips_fwd = pull_series('T5YIFRM',              start=DATA_START).dropna()
 clev5    = pull_series('EXPINF5YR',            start=DATA_START).dropna()
 
@@ -1456,11 +1381,9 @@ fig.show()
 
 dgs10  = pull_series('DGS10',        start=DATA_START).dropna().resample('MS').mean()
 dgs2   = pull_series('DGS2',         start=DATA_START).dropna().resample('MS').mean()
-dgs3m  = pull_series('DGS3MO',       start=DATA_START).dropna().resample('MS').mean()
 hy_spr = pull_series('BAMLH0A0HYM2', start=DATA_START).dropna().resample('MS').mean()
 ig_spr = pull_series('BAMLC0A4CBBB', start=DATA_START).dropna().resample('MS').mean()
 vix    = pull_series('VIXCLS',        start=DATA_START).dropna().resample('MS').mean()
-nfci   = pull_series('NFCI',          start=DATA_START).dropna()
 
 spread_series = (dgs10 - dgs2).dropna()
 spread_10_2   = spread_series.iloc[-1]
@@ -1533,8 +1456,7 @@ def fetch_fed_speeches(n=6):
                         'url':   l.group(1).strip() if l else '#',
                         'speaker': s.group(1).strip() if s else 'Federal Reserve'})
         return out
-    except Exception:
-        return []
+    except Exception: return []
 
 def fetch_feds_papers(n=4):
     url = "https://www.federalreserve.gov/feeds/feds.xml"
@@ -1553,8 +1475,7 @@ def fetch_feds_papers(n=4):
                         'url':   l.group(1).strip() if l else '#',
                         'desc':  (re.sub(r'<.*?>','',dc.group(1)).strip()[:200]+'...') if dc else ''})
         return out
-    except Exception:
-        return []
+    except Exception: return []
 
 speeches = fetch_fed_speeches()
 papers   = fetch_feds_papers()
@@ -1573,20 +1494,15 @@ paper_lines = "\n".join(
     for p in papers) or "- No papers retrieved"
 
 prompt = f"""Today: {now_str}. Upcoming FOMC cycle special topic identification.
-
 Recent Federal Reserve speeches:
 {speech_lines}
-
 Recent FEDS working papers:
 {paper_lines}
-
 Current conditions: Core PCE {core_latest:.1f}% ({core_date}),
 unemployment gap {ugap:+.1f} pp ({unrate_date}),
 10s-2s spread {spread_10_2:+.2f} pp ({t10_date}).
-
-Propose 3 potential Tealbook special topics for the next FOMC meeting.
-For each topic: 1) concise title (under 10 words), 2) one sentence on policy
-relevance citing specific data, 3) one sentence on the anchoring analysis.
+Propose 3 potential Tealbook special topics. For each: 1) concise title under 10 words,
+2) one sentence on policy relevance citing specific data, 3) one sentence on anchoring analysis.
 Number them clearly."""
 
 print("### Suggested Special Topics\n")
@@ -1600,7 +1516,7 @@ from IPython.display import display, HTML
 if speeches:
     rows = ""
     for i, s in enumerate(speeches):
-        bg = "#f5f7fb" if i % 2 == 0 else "white"
+        bg = "#f5f7fb" if i%2==0 else "white"
         rows += f"""<tr style="background:{bg};">
           <td style="padding:6px 10px;color:#555;">{s['date']}</td>
           <td style="padding:6px 10px;">{s['speaker']}</td>
@@ -1619,7 +1535,7 @@ if speeches:
 if papers:
     rows = ""
     for i, p in enumerate(papers):
-        bg = "#f5f7fb" if i % 2 == 0 else "white"
+        bg = "#f5f7fb" if i%2==0 else "white"
         rows += f"""<tr style="background:{bg};">
           <td style="padding:6px 10px;color:#555;">{p['date']}</td>
           <td style="padding:6px 10px;">
