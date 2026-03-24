@@ -1081,7 +1081,7 @@ new_sf = pull_series('HSN1F',         start='2003-01-01').dropna() / 1000
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=exist.index, y=exist.values, mode='lines',
-    name='Existing (left)', yaxis='y1', line=line(C1),
+    name='Existing (left)', yaxis='y1', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
 fig.add_trace(go.Scatter(x=new_sf.index, y=new_sf.values, mode='lines',
     name='New SF (right)', yaxis='y2', line=line(C2),
@@ -1110,7 +1110,7 @@ cap_s = (pull_series('ANXAVS',   start=DATA_START).dropna().rolling(3).mean()/10
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cap_o.index, y=cap_o.values, mode='lines',
-    name='Orders', line=line(C1),
+    name='Orders', line=line(C2),
     hovertemplate='%{x|%b %Y}: $%{y:.1f}B<extra></extra>'))
 fig.add_trace(go.Scatter(x=cap_s.index, y=cap_s.values, mode='lines',
     name='Shipments', line=line(C3),
