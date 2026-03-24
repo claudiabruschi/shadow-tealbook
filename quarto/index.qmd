@@ -578,12 +578,18 @@ for label, saar_t, contrib_t, spf_name in COMPONENTS:
     contrib_rows.append({'label':label,'bold':bold,'q_prev':qp_c,'v_prev':vp_c,
                          'q_curr':qc_c,'v_curr':vc_c})
 
-# RCBI and REXPORT: quarterly contribution forecasts from SPF Level files
+# RCBI and REXPORT: quarterly contribution forecasts from SPF Level files (chained $B)
 spf_rcbi = pull_spf_level('RCBI',    row_index=-1)
 spf_rexp = pull_spf_level('REXPORT', row_index=-1)
 
-def _rcbi(q): return spf_rcbi.get(q)   # inventory contribution, chained $B
-def _rexp(q): return spf_rexp.get(q)   # net export contribution, chained $B
+def _rcbi(q): return spf_rcbi.get(q)
+def _rexp(q): return spf_rexp.get(q)
+
+# Realized BEA levels for q_curr (chained $B, SAAR) — for apples-to-apples comparison
+_cbi_s    = pull_series('CBI',    start=DATA_START).dropna()
+_netexp_s = pull_series('NETEXP', start=DATA_START).dropna()
+_cbi_curr    = round(float(_cbi_s.iloc[-1]),    1) if not _cbi_s.empty    else None
+_netexp_curr = round(float(_netexp_s.iloc[-1]), 1) if not _netexp_s.empty else None
 
 gdp_row      = saar_rows[0]
 q_last       = gdp_row['q_prev']   # last released quarter (context only)
@@ -814,28 +820,32 @@ Government:
 - Federal contribution ({q_now} SPF): {_f(_sv('Federal government', q_now))}%
 - State & local ({q_now} SPF): {_f(_sv('State & local govt', q_now))}%
 - Federal realized ({q_curr}): {_fp(_cv('Federal government'))} pp
-External — inventories (chained $B, quarterly contribution, SPF RCBI Level file):
-- Realized {q_curr}: {_fp(_cv('Change in inventories'))} pp
-- SPF {q_now}: {_f(_rcbi(q_now))}B
-- SPF {q_next}: {_f(_rcbi(q_next))}B
-External — net exports (chained $B, quarterly contribution, SPF REXPORT Level file):
-- Realized {q_curr}: {_fp(_cv('Net exports'))} pp
-- SPF {q_now}: {_f(_rexp(q_now))}B
-- SPF {q_next}: {_f(_rexp(q_next))}B
+External — inventories (chained $B SAAR, for direct comparison):
+- Realized BEA level {q_curr} (CBI): {_f(_cbi_curr)}B
+- SPF forecast {q_now} (RCBI): {_f(_rcbi(q_now))}B
+- SPF forecast {q_next} (RCBI): {_f(_rcbi(q_next))}B
+- Realized pp contribution {q_curr} (context only): {_fp(_cv('Change in inventories'))} pp
+External — net exports (chained $B SAAR, for direct comparison):
+- Realized BEA level {q_curr} (NETEXP): {_f(_netexp_curr)}B
+- SPF forecast {q_now} (REXPORT): {_f(_rexp(q_now))}B
+- SPF forecast {q_next} (REXPORT): {_f(_rexp(q_next))}B
+- Realized pp contribution {q_curr} (context only): {_fp(_cv('Net exports'))} pp
 TASK:
 Paragraph 1:
 Describe the outlook for business fixed investment in {q_now} and {q_next}, noting whether it is expected to strengthen or weaken relative to {q_curr}.
 Paragraph 2:
 Describe the contribution of government spending in {q_now} and whether it represents a positive or negative impulse to growth.
 Paragraph 3:
-Using the SPF RCBI and REXPORT forecasts (quarterly contributions in chained dollars):
-- State whether inventory investment in {q_now} is expected to be positive or negative
-  relative to {q_curr}, and whether this implies accumulation or drawdown.
-- State whether net exports in {q_now} are expected to add to or subtract from GDP,
-  and whether this is an improvement or deterioration relative to {q_curr}.
-- Conclude whether these two components together are likely to distort {q_now}
-  headline GDP relative to underlying final demand, and in which direction.
-If a value is n/a, acknowledge the data limitation briefly.
+All values below are in chained dollars (SAAR), enabling direct comparison.
+- For inventories: compare the realized BEA level in {q_curr} to the SPF forecast for {q_now}.
+  If {q_now} is higher than {q_curr}, inventories are expected to accumulate (positive GDP contribution);
+  if lower, a drawdown is expected (negative contribution). State the direction and approximate magnitude.
+- For net exports: compare the realized BEA level in {q_curr} to the SPF forecast for {q_now}.
+  A more negative (or less positive) value in {q_now} vs {q_curr} implies a larger drag on GDP.
+  State the direction and approximate magnitude.
+- Conclude whether these two components together are likely to add to or subtract from
+  {q_now} headline GDP relative to underlying final demand.
+Do not mix percentage point contributions with chained dollar levels in the same sentence.
 """
 print(call_claude(prompt_4, max_tokens=420))
 ```
