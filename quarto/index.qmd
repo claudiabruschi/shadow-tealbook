@@ -23,16 +23,19 @@ sys.path.insert(0, str(Path('.').resolve().parent))
 from data.fred_pulls import pull_series, get_series
 
 # ── Global color & line system ────────────────────────────────────────────────
-# C1 = Fed blue  = primary series / actuals        (solid)
+# C1 = Black     = primary series / actuals        (solid)
 # C2 = Fed red   = secondary series / forecasts    (dash)
 # C3 = Gray      = alternative / reference lines   (dot)
 # C4 = Green     = used ONLY for PCE growth chart
 # C5 = Orange    = volatility indicators (VIX, claims)
-C1 = '#003087'; C2 = '#C41E3A'; C3 = '#6B6B6B'; C4 = '#2E7D32'; C5 = '#E65100'
-BLUE = C1; RED = C2; GRAY = C3; GREEN = C4; ORANGE = C5  # aliases
+C1 = '#000000'; C2 = '#C41E3A'; C3 = '#6B6B6B'; C4 = '#2E7D32'; C5 = '#E65100'
+BLACK = C1; RED = C2; GRAY = C3; GREEN = C4; ORANGE = C5  # aliases
 
-def line(color, style='solid', width=None):
-    """Consistent line style helper — always use this, never hardcode."""
+def line(color, style=None, width=None):
+    """Consistent line style helper — always use this, never hardcode.
+    Defaults: C1/C2=solid, C3=dash (reference lines), C5=solid."""
+    if style is None:
+        style = 'dash' if color == C3 else 'solid'
     w = width if width else (2.0 if style == 'solid' else 1.5)
     return dict(color=color, width=w, dash=style)
 
@@ -781,7 +784,9 @@ Describe the outlook for business fixed investment in {q_now} and {q_next}, noti
 Paragraph 2:
 Describe the contribution of government spending in {q_now} and whether it represents a positive or negative impulse to growth.
 Paragraph 3:
-Explain the role of inventories and net exports in {q_now}, noting whether they are likely to temporarily distort headline GDP relative to underlying demand.
+Compare the expected level of inventories and trade in {q_now} relative to {q_curr}.
+Use the direction and implied change in contributions to characterize whether inventories are being rebuilt or drawn down, and whether trade flows are likely to add to or subtract from {q_now} GDP.
+Note whether these volatile components are likely to distort {q_now} headline GDP relative to underlying final demand.
 """
 print(call_claude(prompt_4, max_tokens=420))
 ```
@@ -914,9 +919,13 @@ Latest actual GDP ({q_curr}): {_f(gdp_curr_v)}%
 SPF forecasts: {' | '.join(f'{q}: {_f(spf_gdp.get(q))}%' for q in spf_qs)}
 
 TASK — Write exactly 1 paragraph (3 complete sentences):
-1. State the output gap as of {og_date} and characterize whether the economy is operating above or below potential.
-2. Compare the SPF growth trajectory to both the CBO potential growth rate and the FOMC longer-run rate of {fomc_lr_gdp}%, noting the implied direction of the output gap.
-3. Name one specific upside risk and one specific downside risk to convergence toward potential, each tied to a named GDP component.
+1. State the output gap level as of {og_date}. If positive, note the economy is operating above potential
+   in LEVEL terms, while also noting whether the current growth RATE is above or below potential growth,
+   which determines whether the gap is widening or narrowing.
+2. Compare the SPF growth trajectory to the CBO potential growth rate, stating explicitly whether
+   the gap is projected to widen or narrow over the forecast horizon.
+3. Name one specific upside risk and one specific downside risk to this trajectory,
+   each tied to a named GDP component.
 """
 print(call_claude(prompt_5, max_tokens=260))
 ```
@@ -940,9 +949,15 @@ Main drivers: {driver_summary}
 Beige Book ({beige_date}):
 {beige_text[:1200]}
 TASK:
-Write exactly one sentence linking a concrete qualitative theme from the Beige Book
-to the GDP outlook for {q_now}, using cautious language
-("consistent with", "suggesting", "may weigh on", "appears to support").
+Write exactly 2-3 sentences. Do NOT simply confirm the GDP headline.
+Instead:
+1. Extract the single most concrete, specific qualitative driver mentioned in the Beige Book
+   (e.g. a specific sector, demand source, or cost pressure — not "mixed activity").
+2. Link it to a specific GDP component in {q_now} using cautious language
+   ("consistent with", "suggesting", "may weigh on", "appears to support").
+3. If a second distinct driver is prominent and affects a different component, add one more sentence.
+Omit generic characterizations like "activity grew modestly in most districts."
+If no concrete driver is identifiable, return exactly: OMIT
 """
     result = call_claude(prompt_bb, max_tokens=120).strip()
     if result.upper() != 'OMIT':
@@ -1212,72 +1227,91 @@ print(call_claude(prompt))
 ```{python}
 #| label: plot-labor-1
 
+# Row 1: Payrolls + Unemployment
 fn = next_fig()
-fig = sp.make_subplots(rows=1, cols=3,
-    subplot_titles=(f"Figure {fn} — Nonfarm Payrolls (thous.)",
-                    f"Figure {fn+1} — Unemployment Rate (%)",
-                    f"Figure {fn+2} — Avg Hourly Earnings YoY (%)"),
-    horizontal_spacing=0.08)
-_fig_count += 2
-
+figA = go.Figure()
 p = payrolls[CHART_START:]
-fig.add_trace(go.Bar(x=p.index, y=p.values,
+figA.add_trace(go.Bar(x=p.index, y=p.values,
     marker_color=[C1 if v>=0 else C2 for v in p], name='Payrolls',
-    hovertemplate='%{x|%b %Y}: %{y:,.0f}K<extra></extra>'), row=1, col=1)
-fig.add_hline(y=0, line_width=0.5, line_color='black', row=1, col=1)
+    hovertemplate='%{x|%b %Y}: %{y:,.0f}K<extra></extra>'))
+figA.add_hline(y=0, line_width=0.8, line_color='black')
+figA.update_layout(**base_layout(f'Figure {fn} — Nonfarm Payrolls',
+    subtitle='Monthly change, thousands, SA'))
+figA.update_yaxes(tickformat=',')
 
+fn2 = next_fig()
+figB = go.Figure()
 ur = unrate[CHART_START:]
 nr = nrou.reindex(ur.index, method='ffill')
-fig.add_trace(go.Scatter(x=ur.index, y=ur.values, name='U-3',
-    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=2)
-fig.add_trace(go.Scatter(x=nr.index, y=nr.values, name='Natural rate',
-    line=line(C2,'dash'), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=2)
-fig.add_hline(y=fomc_lr_unemp, line_width=0.9, line_color=C3, line_dash='dot',
-    annotation_text=f'LR {fomc_lr_unemp}%', row=1, col=2)
-
-a = ahe[CHART_START:]
-fig.add_trace(go.Scatter(x=a.index, y=a.values, name='AHE YoY',
-    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=3)
-fig.add_hline(y=0, line_width=0.5, line_color='black', row=1, col=3)
-
-fig.update_layout(**fed_layout(height=420))
-fig.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
-fig.show()
+figB.add_trace(go.Scatter(x=ur.index, y=ur.values, name='U-3',
+    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figB.add_trace(go.Scatter(x=nr.index, y=nr.values, name='Natural rate (CBO)',
+    line=line(C2), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figB.add_hline(y=fomc_lr_unemp, line_color=C3, line_dash='dash', line_width=1.2,
+    annotation_text=f'LR {fomc_lr_unemp}%', annotation_position='top right')
+figB.update_layout(**base_layout(f'Figure {fn2} — Unemployment Rate',
+    subtitle='Percent, SA'))
+figB.update_yaxes(ticksuffix='%')
+show(figA, 'Source: BLS (PAYEMS) via FRED')
+show(figB, 'Source: BLS (UNRATE), CBO (NROU) via FRED')
 ```
 
 ```{python}
 #| label: plot-labor-2
 
-fn = next_fig()
-fig = sp.make_subplots(rows=1, cols=3,
-    subplot_titles=(f"Figure {fn} — JOLTS Rates (%, 3-mo MA)",
-                    f"Figure {fn+1} — Labor Force Participation & E-Pop (%)",
-                    f"Figure {fn+2} — Initial UI Claims (thous., 4-wk MA)"),
-    horizontal_spacing=0.08)
-_fig_count += 2
+# Row 2: AHE + JOLTS
+fn3 = next_fig()
+figC = go.Figure()
+a = ahe[CHART_START:]
+figC.add_trace(go.Scatter(x=a.index, y=a.values, name='AHE YoY',
+    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figC.add_hline(y=0, line_width=0.8, line_color='black')
+figC.update_layout(**base_layout(f'Figure {fn3} — Avg Hourly Earnings',
+    subtitle='Year-over-year percent change'))
+figC.update_yaxes(ticksuffix='%')
 
+fn4 = next_fig()
+figD = go.Figure()
 for s, name, color, dash in [
     (jolts_o, 'Openings', C1, 'solid'),
-    (jolts_q, 'Quits',    C2, 'dash'),
-    (jolts_h, 'Hires',    C3, 'dot'),
+    (jolts_q, 'Quits',    C2, 'solid'),
+    (jolts_h, 'Hires',    C3, None),
 ]:
     s2 = s[CHART_START:].dropna()
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=1)
+    figD.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
+        line=line(color, dash), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figD.update_layout(**base_layout(f'Figure {fn4} — JOLTS Rates',
+    subtitle='Percent, 3-month moving average'))
+figD.update_yaxes(ticksuffix='%')
+show(figC, 'Source: BLS (CES0500000003) via FRED')
+show(figD, 'Source: BLS (JTSJOR, JTSQUR, JTS1000HIR) via FRED')
+```
 
+```{python}
+#| label: plot-labor-3
+
+# Row 3: LFPR/E-Pop + Claims
+fn5 = next_fig()
+figE = go.Figure()
 lf = lfpr[CHART_START:]; ep = epop25[CHART_START:]
-fig.add_trace(go.Scatter(x=lf.index, y=lf.values, name='LFPR (total)',
-    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=2)
-fig.add_trace(go.Scatter(x=ep.index, y=ep.values, name='E-Pop 25-54',
-    line=line(C2,'dash'), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'), row=1, col=2)
+figE.add_trace(go.Scatter(x=lf.index, y=lf.values, name='LFPR (total)',
+    line=line(C1), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figE.add_trace(go.Scatter(x=ep.index, y=ep.values, name='E-Pop 25-54',
+    line=line(C2), hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+figE.update_layout(**base_layout(f'Figure {fn5} — Labor Force Participation & E-Pop',
+    subtitle='Percent'))
+figE.update_yaxes(ticksuffix='%')
 
+fn6 = next_fig()
+figF = go.Figure()
 c = claims[CHART_START:]
-fig.add_trace(go.Scatter(x=c.index, y=c.values, name='Initial claims',
-    line=line(C5), hovertemplate='%{x|%b %Y}: %{y:,.0f}K<extra></extra>'), row=1, col=3)
-
-fig.update_layout(**fed_layout(height=420))
-fig.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
-fig.show()
+figF.add_trace(go.Scatter(x=c.index, y=c.values, name='Initial claims',
+    line=line(C5), hovertemplate='%{x|%b %Y}: %{y:,.0f}<extra></extra>'))
+figF.update_layout(**base_layout(f'Figure {fn6} — Initial UI Claims',
+    subtitle='Thousands, 4-week moving average'))
+figF.update_yaxes(tickformat=',')
+show(figE, 'Source: BLS (CIVPART, LNS12300060) via FRED')
+show(figF, 'Source: DOL (IC4WSA) via FRED')
 ```
 
 ---
@@ -1329,46 +1363,75 @@ print(call_claude(prompt))
 ```
 
 ```{python}
-#| label: plot-inflation
+#| label: plot-inflation-1
 
+# Row 1: Headline CPI & PCE + Core PCE measures
 fn = next_fig()
-fig = sp.make_subplots(rows=1, cols=3,
-    subplot_titles=(f"Figure {fn} — Headline CPI & PCE (YoY %)",
-                    f"Figure {fn+1} — Core PCE Measures (YoY %)",
-                    f"Figure {fn+2} — Inflation Expectations (%)"),
-    horizontal_spacing=0.08)
-_fig_count += 2
+fig1 = go.Figure()
+fig1.add_trace(go.Scatter(x=cpi[CHART_START:].index, y=cpi[CHART_START:].values,
+    name='CPI', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig1.add_trace(go.Scatter(x=pce[CHART_START:].index, y=pce[CHART_START:].values,
+    name='PCE', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig1.add_hline(y=2.0, line_color=C3, line_dash='dash', line_width=1.2,
+    annotation_text='2%', annotation_position='top right')
+fig1.update_layout(**base_layout(f'Figure {fn} — Headline CPI & PCE',
+    subtitle='Year-over-year percent change'))
+fig1.update_yaxes(ticksuffix='%')
 
-for s, name, color, dash in [(cpi,'CPI',C2,'solid'),(pce,'PCE',C3,'dash')]:
-    s2 = s[CHART_START:]
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'), row=1, col=1)
-fig.add_hline(y=2.0, line_width=0.9, line_color='black', line_dash='dot',
-    annotation_text='2%', row=1, col=1)
+fn2 = next_fig()
+fig2 = go.Figure()
+fig2.add_trace(go.Scatter(x=trim_pce[CHART_START:].index, y=trim_pce[CHART_START:].values,
+    name='Trimmed mean', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig2.add_trace(go.Scatter(x=mkt_pce[CHART_START:].index, y=mkt_pce[CHART_START:].values,
+    name='Market-based', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig2.add_trace(go.Scatter(x=core_pce[CHART_START:].index, y=core_pce[CHART_START:].values,
+    name='Core PCE', line=line(C3),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig2.add_hline(y=2.0, line_color=C3, line_dash='dash', line_width=1.2,
+    annotation_text='2%', annotation_position='top right')
+fig2.update_layout(**base_layout(f'Figure {fn2} — Core PCE Measures',
+    subtitle='Year-over-year percent change'))
+fig2.update_yaxes(ticksuffix='%')
+show(fig1, 'Source: BLS (CPIAUCSL), BEA (PCEPI) via FRED')
+show(fig2, 'Source: Dallas Fed (PCETRIM12M159SFRBDAL), BEA (DPCXRG3M086SBEA, PCEPILFE) via FRED')
+```
 
-for s, name, color, dash in [
-    (trim_pce,'Trimmed mean',C1,'solid'),
-    (mkt_pce, 'Market-based',C2,'solid'),
-    (core_pce,'Core PCE',    C3,'dot'),
-]:
-    s2 = s[CHART_START:]
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'), row=1, col=2)
-fig.add_hline(y=2.0, line_width=0.9, line_color='black', line_dash='dot', row=1, col=2)
+```{python}
+#| label: plot-inflation-2
 
-for s, name, color, dash in [
-    (tips_fwd,'5yr5yr TIPS',C2,'solid'),
-    (clev5,   'Cleveland 5-yr',C1,'dash'),
-]:
-    s2 = s[CHART_START:]
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'), row=1, col=3)
-fig.add_hline(y=2.0, line_width=0.9, line_color='black', line_dash='dot',
-    annotation_text='2%', row=1, col=3)
+# Row 2: Inflation expectations + ECI/AHE wage pressures
+fn3 = next_fig()
+fig3 = go.Figure()
+fig3.add_trace(go.Scatter(x=tips_fwd[CHART_START:].index, y=tips_fwd[CHART_START:].values,
+    name='5yr5yr TIPS', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig3.add_trace(go.Scatter(x=clev5[CHART_START:].index, y=clev5[CHART_START:].values,
+    name='Cleveland 5-yr', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig3.add_hline(y=2.0, line_color=C3, line_dash='dash', line_width=1.2,
+    annotation_text='2%', annotation_position='top right')
+fig3.update_layout(**base_layout(f'Figure {fn3} — Inflation Expectations',
+    subtitle='Percent'))
+fig3.update_yaxes(ticksuffix='%')
 
-fig.update_layout(**fed_layout(height=420))
-fig.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
-fig.show()
+fn4 = next_fig()
+fig4 = go.Figure()
+fig4.add_trace(go.Scatter(x=eci[CHART_START:].index, y=eci[CHART_START:].values,
+    name='ECI private wages', line=line(C1),
+    hovertemplate='%{x|%Y Q%q}: %{y:.1f}%<extra></extra>'))
+ahe_inf2 = pull_series('CES0500000003', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+fig4.add_trace(go.Scatter(x=ahe_inf2[CHART_START:].index, y=ahe_inf2[CHART_START:].values,
+    name='AHE YoY', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
+fig4.update_layout(**base_layout(f'Figure {fn4} — Labor Cost Pressures',
+    subtitle='Year-over-year percent change'))
+fig4.update_yaxes(ticksuffix='%')
+show(fig3, 'Source: FRB (T5YIFRM), Cleveland Fed (EXPINF5YR) via FRED')
+show(fig4, 'Source: BLS (ECIWAG, CES0500000003) via FRED')
 ```
 
 ---
@@ -1393,38 +1456,63 @@ vix_date      = month_label(pd.Timestamp(vix.index[-1]))
 ```
 
 ```{python}
-#| label: plot-financial
+#| label: plot-financial-1
 
+# Row 1: Treasury yields + Credit spreads
 fn = next_fig()
-fig = sp.make_subplots(rows=1, cols=3,
-    subplot_titles=(f"Figure {fn} — Treasury Yields & Spread (%)",
-                    f"Figure {fn+1} — Credit Spreads (bp, OAS)",
-                    f"Figure {fn+2} — VIX"),
-    horizontal_spacing=0.08)
-_fig_count += 2
+fig1 = go.Figure()
+fig1.add_trace(go.Scatter(x=dgs10[CHART_START:].index, y=dgs10[CHART_START:].values,
+    name='10-yr', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig1.add_trace(go.Scatter(x=dgs2[CHART_START:].index, y=dgs2[CHART_START:].values,
+    name='2-yr', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig1.add_trace(go.Scatter(x=spread_series[CHART_START:].index, y=spread_series[CHART_START:].values,
+    name='10s-2s spread', line=line(C3),
+    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+fig1.add_hline(y=0, line_width=0.8, line_color='black')
+fig1.update_layout(**base_layout(f'Figure {fn} — Treasury Yields & Spread',
+    subtitle='Percent, monthly average'))
+fig1.update_yaxes(ticksuffix='%')
 
-for s, name, color, dash in [
-    (dgs10,         '10-yr',        C1, 'solid'),
-    (dgs2,          '2-yr',         C2, 'dash'),
-    (spread_series, '10s-2s spread',C3, 'dot'),
-]:
-    s2 = s[CHART_START:]
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color,dash), hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'), row=1, col=1)
-fig.add_hline(y=0, line_width=0.5, line_color='black', row=1, col=1)
+fn2 = next_fig()
+fig2 = go.Figure()
+fig2.add_trace(go.Scatter(x=hy_spr[CHART_START:].index, y=hy_spr[CHART_START:].values,
+    name='HY (OAS)', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.0f} bp<extra></extra>'))
+fig2.add_trace(go.Scatter(x=ig_spr[CHART_START:].index, y=ig_spr[CHART_START:].values,
+    name='BBB (OAS)', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.0f} bp<extra></extra>'))
+fig2.update_layout(**base_layout(f'Figure {fn2} — Credit Spreads',
+    subtitle='Basis points, OAS, monthly average'))
+show(fig1, 'Source: FRB (DGS10, DGS2) via FRED')
+show(fig2, 'Source: ICE BofA (BAMLH0A0HYM2, BAMLC0A4CBBB) via FRED')
+```
 
-for s, name, color in [(hy_spr,'HY (OAS)',C2),(ig_spr,'BBB (OAS)',C1)]:
-    s2 = s[CHART_START:]
-    fig.add_trace(go.Scatter(x=s2.index, y=s2.values, name=name,
-        line=line(color), hovertemplate='%{x|%b %Y}: %{y:.0f} bp<extra></extra>'), row=1, col=2)
+```{python}
+#| label: plot-financial-2
 
-v = vix[CHART_START:]
-fig.add_trace(go.Scatter(x=v.index, y=v.values, name='VIX',
-    line=line(C5), hovertemplate='%{x|%b %Y}: %{y:.1f}<extra></extra>'), row=1, col=3)
+# Row 2: VIX + NFCI
+fn3 = next_fig()
+fig3 = go.Figure()
+fig3.add_trace(go.Scatter(x=vix[CHART_START:].index, y=vix[CHART_START:].values,
+    name='VIX', line=line(C5),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}<extra></extra>'))
+fig3.update_layout(**base_layout(f'Figure {fn3} — VIX Volatility Index',
+    subtitle='Monthly average'))
 
-fig.update_layout(**fed_layout(height=420))
-fig.update_xaxes(range=[CHART_START, TODAY.strftime('%Y-%m-%d')])
-fig.show()
+fn4 = next_fig()
+nfci = pull_series('NFCI', start=DATA_START).dropna()
+fig4 = go.Figure()
+fig4.add_trace(go.Scatter(x=nfci[CHART_START:].index, y=nfci[CHART_START:].values,
+    name='NFCI', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.3f}<extra></extra>'))
+fig4.add_hline(y=0, line_color=C3, line_dash='dash', line_width=1.2,
+    annotation_text='neutral', annotation_position='top right')
+fig4.update_layout(**base_layout(f'Figure {fn4} — Chicago Fed NFCI',
+    subtitle='Index; positive = tighter than average'))
+show(fig3, 'Source: CBOE (VIXCLS) via FRED')
+show(fig4, 'Source: Chicago Fed (NFCI) via FRED')
 ```
 
 ---
