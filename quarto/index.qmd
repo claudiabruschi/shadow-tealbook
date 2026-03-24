@@ -847,7 +847,7 @@ All values below are in chained dollars (SAAR), enabling direct comparison.
   {q_now} headline GDP relative to underlying final demand.
 Do not mix percentage point contributions with chained dollar levels in the same sentence.
 """
-print(call_claude(prompt_4, max_tokens=420))
+print(call_claude(prompt_4, max_tokens=450))
 ```
 
 ```{python}
