@@ -775,18 +775,25 @@ Government:
 - Federal contribution ({q_now} SPF): {_f(_sv('Federal government', q_now))}%
 - State & local ({q_now} SPF): {_f(_sv('State & local govt', q_now))}%
 - Federal realized ({q_curr}): {_fp(_cv('Federal government'))} pp
-External:
-- Inventories ({q_curr} realized): {_fp(_cv('Change in inventories'))} pp
-- Net exports ({q_curr} realized): {_fp(_cv('Net exports'))} pp
+External — inventories:
+- Realized {q_curr}: {_fp(_cv('Change in inventories'))} pp
+- SPF {q_now}: {_f(_sv('Change in inventories', q_now))} pp
+- SPF {q_next}: {_f(_sv('Change in inventories', q_next))} pp
+External — net exports:
+- Realized {q_curr}: {_fp(_cv('Net exports'))} pp
+- SPF {q_now}: {_f(_sv('Net exports', q_now))} pp
+- SPF {q_next}: {_f(_sv('Net exports', q_next))} pp
 TASK:
 Paragraph 1:
 Describe the outlook for business fixed investment in {q_now} and {q_next}, noting whether it is expected to strengthen or weaken relative to {q_curr}.
 Paragraph 2:
 Describe the contribution of government spending in {q_now} and whether it represents a positive or negative impulse to growth.
 Paragraph 3:
-Compare the expected level of inventories and trade in {q_now} relative to {q_curr}.
-Use the direction and implied change in contributions to characterize whether inventories are being rebuilt or drawn down, and whether trade flows are likely to add to or subtract from {q_now} GDP.
-Note whether these volatile components are likely to distort {q_now} headline GDP relative to underlying final demand.
+Compare inventory investment and net exports between {q_curr} (realized) and {q_now} (SPF):
+- State whether the SPF expects inventory contributions to increase, decrease, or remain stable vs {q_curr}, and interpret as restocking or destocking.
+- State whether the SPF expects net exports to be a smaller drag, larger drag, or positive contribution in {q_now} vs {q_curr}.
+- Conclude whether these volatile components are likely to distort {q_now} headline GDP relative to underlying final demand, and in which direction.
+If SPF data shows n/a for either component, note that contributions are untracked and draw inference only from the {q_curr} realized level.
 """
 print(call_claude(prompt_4, max_tokens=420))
 ```
@@ -1074,7 +1081,7 @@ new_sf = pull_series('HSN1F',         start='2003-01-01').dropna() / 1000
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=exist.index, y=exist.values, mode='lines',
-    name='Existing (left)', yaxis='y1', line=line(C3),
+    name='Existing (left)', yaxis='y1', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
 fig.add_trace(go.Scatter(x=new_sf.index, y=new_sf.values, mode='lines',
     name='New SF (right)', yaxis='y2', line=line(C2),
@@ -1103,7 +1110,7 @@ cap_s = (pull_series('ANXAVS',   start=DATA_START).dropna().rolling(3).mean()/10
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cap_o.index, y=cap_o.values, mode='lines',
-    name='Orders', line=line(C2),
+    name='Orders', line=line(C1),
     hovertemplate='%{x|%b %Y}: $%{y:.1f}B<extra></extra>'))
 fig.add_trace(go.Scatter(x=cap_s.index, y=cap_s.values, mode='lines',
     name='Shipments', line=line(C3),
