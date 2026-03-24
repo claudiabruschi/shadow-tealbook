@@ -501,6 +501,38 @@ def pull_spf(spf_name, row_index=-1):
         print(f'  [WARNING] SPF {spf_name}: {e}')
         return {}
 
+SPF_BASE_LVL = ('https://www.philadelphiafed.org/-/media/FRBP/Assets/'
+                'Surveys-And-Data/survey-of-professional-forecasters/'
+                'data-files/files/Median_{}_Level.xlsx')
+
+def pull_spf_level(spf_name, row_index=-1):
+    """Pull SPF level forecasts (e.g. RCBI, REXPORT, UNEMP).
+    Returns dict {quarter_label: level_value}."""
+    try:
+        r = requests.get(SPF_BASE_LVL.format(spf_name), timeout=20)
+        r.raise_for_status()
+        df = pd.read_excel(io.BytesIO(r.content), engine='openpyxl')
+        df.columns = [str(c).strip() for c in df.columns]
+        prefix = spf_name   # level files: RCBI2..RCBI6, REXPORT2..REXPORT6
+        col_now = f'{prefix}2'
+        df_clean = df.dropna(subset=['YEAR', 'QUARTER'])
+        if col_now in df_clean.columns:
+            df_clean = df_clean[df_clean[col_now].notna()]
+        if df_clean.empty or len(df_clean) < abs(row_index):
+            return {}
+        row  = df_clean.iloc[row_index]
+        year = int(row['YEAR']); qtr = int(row['QUARTER'])
+        result = {}
+        for h in range(2, 7):
+            col = f'{prefix}{h}'
+            if col in row.index and pd.notna(row[col]):
+                offset = h - 2; total = (qtr-1) + offset
+                result[f'Q{(total%4)+1} {year+total//4}'] = round(float(row[col]), 1)
+        return result
+    except Exception as e:
+        print(f'  [WARNING] SPF level {spf_name}: {e}')
+        return {}
+
 COMPONENTS = [
     ('Real GDP',                'A191RL1Q225SBEA', 'A191RL1Q225SBEA', 'RGDP'),
     ('PCE',                     'DPCERL1Q225SBEA', 'DPCERY2Q224SBEA', 'RCONSUM'),
@@ -545,6 +577,13 @@ for label, saar_t, contrib_t, spf_name in COMPONENTS:
                       'no_saar':saar_t is None})
     contrib_rows.append({'label':label,'bold':bold,'q_prev':qp_c,'v_prev':vp_c,
                          'q_curr':qc_c,'v_curr':vc_c})
+
+# RCBI and REXPORT: quarterly contribution forecasts from SPF Level files
+spf_rcbi = pull_spf_level('RCBI',    row_index=-1)
+spf_rexp = pull_spf_level('REXPORT', row_index=-1)
+
+def _rcbi(q): return spf_rcbi.get(q)   # inventory contribution, chained $B
+def _rexp(q): return spf_rexp.get(q)   # net export contribution, chained $B
 
 gdp_row      = saar_rows[0]
 q_last       = gdp_row['q_prev']   # last released quarter (context only)
@@ -775,25 +814,28 @@ Government:
 - Federal contribution ({q_now} SPF): {_f(_sv('Federal government', q_now))}%
 - State & local ({q_now} SPF): {_f(_sv('State & local govt', q_now))}%
 - Federal realized ({q_curr}): {_fp(_cv('Federal government'))} pp
-External — inventories:
+External — inventories (chained $B, quarterly contribution, SPF RCBI Level file):
 - Realized {q_curr}: {_fp(_cv('Change in inventories'))} pp
-- SPF {q_now}: {_f(_sv('Change in inventories', q_now))} pp
-- SPF {q_next}: {_f(_sv('Change in inventories', q_next))} pp
-External — net exports:
+- SPF {q_now}: {_f(_rcbi(q_now))}B
+- SPF {q_next}: {_f(_rcbi(q_next))}B
+External — net exports (chained $B, quarterly contribution, SPF REXPORT Level file):
 - Realized {q_curr}: {_fp(_cv('Net exports'))} pp
-- SPF {q_now}: {_f(_sv('Net exports', q_now))} pp
-- SPF {q_next}: {_f(_sv('Net exports', q_next))} pp
+- SPF {q_now}: {_f(_rexp(q_now))}B
+- SPF {q_next}: {_f(_rexp(q_next))}B
 TASK:
 Paragraph 1:
 Describe the outlook for business fixed investment in {q_now} and {q_next}, noting whether it is expected to strengthen or weaken relative to {q_curr}.
 Paragraph 2:
 Describe the contribution of government spending in {q_now} and whether it represents a positive or negative impulse to growth.
 Paragraph 3:
-Compare inventory investment and net exports between {q_curr} (realized) and {q_now} (SPF):
-- State whether the SPF expects inventory contributions to increase, decrease, or remain stable vs {q_curr}, and interpret as restocking or destocking.
-- State whether the SPF expects net exports to be a smaller drag, larger drag, or positive contribution in {q_now} vs {q_curr}.
-- Conclude whether these volatile components are likely to distort {q_now} headline GDP relative to underlying final demand, and in which direction.
-If SPF data shows n/a for either component, note that contributions are untracked and draw inference only from the {q_curr} realized level.
+Using the SPF RCBI and REXPORT forecasts (quarterly contributions in chained dollars):
+- State whether inventory investment in {q_now} is expected to be positive or negative
+  relative to {q_curr}, and whether this implies accumulation or drawdown.
+- State whether net exports in {q_now} are expected to add to or subtract from GDP,
+  and whether this is an improvement or deterioration relative to {q_curr}.
+- Conclude whether these two components together are likely to distort {q_now}
+  headline GDP relative to underlying final demand, and in which direction.
+If a value is n/a, acknowledge the data limitation briefly.
 """
 print(call_claude(prompt_4, max_tokens=420))
 ```
@@ -866,7 +908,7 @@ for r in saar_rows:
 rows_html += f"""<tr style="background:#f0f4ff;">
   <td colspan="{len(hdrs)}" style="padding:6px 10px;font-size:0.78rem;
      font-weight:bold;color:#555;border-top:2px solid #ccc;border-bottom:1px solid #eee;">
-     Contributions (pp) — inventories &amp; net exports (no SPF available)
+     Contributions (pp) — inventories &amp; net exports (SPF RCBI/REXPORT forecasts in $B below)
   </td></tr>"""
 for r in saar_rows:
     if not r['no_saar']: continue
@@ -903,7 +945,7 @@ display(HTML(f"""
 <p style="font-size:0.75rem;color:#888;margin:4px 0 1.2rem 0;">
   Source: Actuals from BEA ({gdp_vintage}); Forecasts from Philadelphia Fed SPF median (columns marked <em>f</em>).<br>
   <em>Prior forecast</em> sub-rows show previous quarter's SPF vintage.
-  Inventories and net exports shown as contributions (pp); no SPF published for these.
+  Inventories and net exports: realized contributions (pp) from BEA; SPF quarterly forecasts from Philadelphia Fed RCBI/REXPORT Level files.
   Italicized row: CBO potential GDP growth rate (GDPPOT).
 </p>"""))
 ```
@@ -1016,22 +1058,32 @@ show(fig, 'Source: FRB (IPXXX001S) via FRED', flush=True)
 ```{python}
 #| label: plot-gdp-3
 
-lv       = pull_series('ALTSALES',   start=DATA_START).dropna()[CHART_START_GDP:]
-auto_asm = pull_series('MVAAUTLTTS', start=DATA_START).dropna()[CHART_START_GDP:]
+lv = pull_series('ALTSALES', start=DATA_START).dropna()[CHART_START_GDP:]
+# MVAAUTLTTS (motor vehicle assemblies) discontinued — use DAUPNSA (domestic auto production)
+# as secondary series; fall back to single-series chart if unavailable
+auto_asm = pull_series('DAUPNSA', start=DATA_START).dropna()
+auto_asm_q = auto_asm.resample('MS').mean() if not auto_asm.empty else auto_asm
+auto_asm_q = auto_asm_q[CHART_START_GDP:]
 
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=lv.index, y=lv.values, mode='lines',
-    name='Sales', line=line(C1),
+    name='Light vehicle sales', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
-fig.add_trace(go.Scatter(x=auto_asm.index, y=auto_asm.values, mode='lines',
-    name='Production (assembly)', line=line(C2),
-    hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
-layout = base_layout(f'Figure {fn} — Sales and Production of Light Motor Vehicles',
-                     subtitle='Millions of units, annual rate')
+if not auto_asm_q.empty:
+    fig.add_trace(go.Scatter(x=auto_asm_q.index, y=auto_asm_q.values / 1000,
+        mode='lines', name='Domestic auto production (000s, right)', yaxis='y2',
+        line=line(C2),
+        hovertemplate='%{x|%b %Y}: %{y:.0f}K<extra></extra>'))
+layout = base_layout(f'Figure {fn} — Light Vehicle Sales',
+                     subtitle='Millions of units, annual rate (SAAR)')
 layout['yaxis']['autorange'] = True
+if not auto_asm_q.empty:
+    layout['yaxis2'] = dict(overlaying='y', side='right', showgrid=False,
+                             zeroline=False, tickfont=dict(size=9), autorange=True)
+    layout['margin'] = dict(l=55, r=45, t=65, b=50)
 fig.update_layout(**layout)
-show(fig, "Source: BEA (ALTSALES) and FRB (MVAAUTLTTS) via FRED")
+show(fig, "Source: BEA (ALTSALES), Fed (DAUPNSA) via FRED")
 ```
 
 ```{python}
@@ -1081,7 +1133,7 @@ new_sf = pull_series('HSN1F',         start='2003-01-01').dropna() / 1000
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=exist.index, y=exist.values, mode='lines',
-    name='Existing (left)', yaxis='y1', line=line(C3),
+    name='Existing (left)', yaxis='y1', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
 fig.add_trace(go.Scatter(x=new_sf.index, y=new_sf.values, mode='lines',
     name='New SF (right)', yaxis='y2', line=line(C2),
@@ -1110,7 +1162,7 @@ cap_s = (pull_series('ANXAVS',   start=DATA_START).dropna().rolling(3).mean()/10
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=cap_o.index, y=cap_o.values, mode='lines',
-    name='Orders', line=line(C2),
+    name='Orders', line=line(C1),
     hovertemplate='%{x|%b %Y}: $%{y:.1f}B<extra></extra>'))
 fig.add_trace(go.Scatter(x=cap_s.index, y=cap_s.values, mode='lines',
     name='Shipments', line=line(C3),
