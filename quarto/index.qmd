@@ -918,7 +918,7 @@ for r in saar_rows:
 rows_html += f"""<tr style="background:#f0f4ff;">
   <td colspan="{len(hdrs)}" style="padding:6px 10px;font-size:0.78rem;
      font-weight:bold;color:#555;border-top:2px solid #ccc;border-bottom:1px solid #eee;">
-     Contributions (pp) — inventories &amp; net exports (SPF RCBI/REXPORT forecasts in $B below)
+     Contributions (pp) — inventories &amp; net exports
   </td></tr>"""
 for r in saar_rows:
     if not r['no_saar']: continue
@@ -1068,32 +1068,34 @@ show(fig, 'Source: FRB (IPXXX001S) via FRED', flush=True)
 ```{python}
 #| label: plot-gdp-3
 
-lv = pull_series('ALTSALES', start=DATA_START).dropna()[CHART_START_GDP:]
-# MVAAUTLTTS (motor vehicle assemblies) discontinued — use DAUPNSA (domestic auto production)
-# as secondary series; fall back to single-series chart if unavailable
-auto_asm = pull_series('DAUPNSA', start=DATA_START).dropna()
-auto_asm_q = auto_asm.resample('MS').mean() if not auto_asm.empty else auto_asm
-auto_asm_q = auto_asm_q[CHART_START_GDP:]
+# ALTSALES: light vehicle sales, millions of units SAAR
+# MVAAUTLTTS: total motor vehicle assemblies, millions of units SAAR — same scale, no dual axis
+lv       = pull_series('ALTSALES',   start=DATA_START).dropna()[CHART_START_GDP:]
+auto_asm = pull_series('MVAAUTLTTS', start=DATA_START).dropna()
+
+# Fallback: DAUPNSA (domestic auto production, thousands of units monthly) if MVAAUTLTTS fails
+if auto_asm.empty:
+    _raw = pull_series('DAUPNSA', start=DATA_START).dropna()
+    # Convert from thousands to millions, resample to monthly average
+    auto_asm = (_raw / 1000).resample('MS').mean() if not _raw.empty else _raw
+
+auto_asm = auto_asm[CHART_START_GDP:] if not auto_asm.empty else auto_asm
 
 fn = next_fig()
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=lv.index, y=lv.values, mode='lines',
-    name='Light vehicle sales', line=line(C1),
-    hovertemplate='%{x|%b %Y}: %{y:.2f}M<extra></extra>'))
-if not auto_asm_q.empty:
-    fig.add_trace(go.Scatter(x=auto_asm_q.index, y=auto_asm_q.values / 1000,
-        mode='lines', name='Domestic auto production (000s, right)', yaxis='y2',
-        line=line(C2),
-        hovertemplate='%{x|%b %Y}: %{y:.0f}K<extra></extra>'))
-layout = base_layout(f'Figure {fn} — Light Vehicle Sales',
+    name='Sales', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}M<extra></extra>'))
+if not auto_asm.empty:
+    fig.add_trace(go.Scatter(x=auto_asm.index, y=auto_asm.values, mode='lines',
+        name='Assemblies', line=line(C2),
+        hovertemplate='%{x|%b %Y}: %{y:.1f}M<extra></extra>'))
+layout = base_layout(f'Figure {fn} — Sales and Production of Light Motor Vehicles',
                      subtitle='Millions of units, annual rate (SAAR)')
 layout['yaxis']['autorange'] = True
-if not auto_asm_q.empty:
-    layout['yaxis2'] = dict(overlaying='y', side='right', showgrid=False,
-                             zeroline=False, tickfont=dict(size=9), autorange=True)
-    layout['margin'] = dict(l=55, r=45, t=65, b=50)
 fig.update_layout(**layout)
-show(fig, "Source: BEA (ALTSALES), Fed (DAUPNSA) via FRED")
+src = 'Source: BEA (ALTSALES), FRB (MVAAUTLTTS) via FRED'
+show(fig, src)
 ```
 
 ```{python}
