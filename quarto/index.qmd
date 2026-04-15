@@ -1467,7 +1467,7 @@ compnfb  = pull_series('COMPNFB',              start=DATA_START).dropna().pct_ch
 brent    = pull_series('DCOILBRENTEU',          start=DATA_START).dropna().resample('MS').mean().dropna()
 crb_prx  = pull_series('PPIACO',               start=DATA_START).dropna()         # level, proxy for CRB
 cpi_eng  = pull_series('CPIENGSL',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
-imp_core = pull_series('IRM',                  start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+imp_core = pull_series('IREXFDFLS', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 tips_fwd = pull_series('T5YIFRM',             start=DATA_START).dropna()
 clev10   = pull_series('EXPINF10YR',           start=DATA_START).dropna()
 mich1yr  = pull_series('MICH',                start=DATA_START).dropna()
