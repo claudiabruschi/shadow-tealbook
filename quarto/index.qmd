@@ -1485,19 +1485,27 @@ _f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
 from IPython.display import display, Markdown
 import json, urllib.request, os
 
-def call_claude_search(user_prompt, max_tokens=1800):
+def call_claude_search(user_prompt, max_tokens=2200):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
         return "_[LLM unavailable]_"
     payload = json.dumps({
         "model": "claude-sonnet-4-20250514",
         "max_tokens": max_tokens,
-        "system": """You are a Federal Reserve staff economist writing internal FOMC briefing documents.
-Rules that cannot be broken:
-- Your response begins with the first word of the inflation narrative. No exceptions.
-- Never write "Based on my research", "Here is", "I will now", or any meta-commentary.
-- Never explain what you are about to do. Just do it.
-- Third person, declarative, no hedging. Technical register for FOMC members.""",
+        "system": """You are a Federal Reserve staff economist drafting internal Tealbook A inflation prose.
+
+                    Write in the style of internal FOMC briefing material:
+                    - formal, compact, analytical;
+                    - no meta-commentary;
+                    - no mention of searching or sources;
+                    - no public-facing explanations;
+                    - first sentence must be substantive macroeconomic analysis;
+                    - anchor on PCE inflation and distinguish headline from core;
+                    - separate current conditions, near-term outlook, and medium-term outlook;
+                    - distinguish temporary relative-price movements from underlying inflation pressure.
+                    
+                    If tool results are noisy or conflicting, prioritize official U.S. statistical releases and produce a coherent baseline narrative rather than a news summary.
+                    """,
         "tools": [{"type": "web_search_20250305", "name": "web_search"}],
         "messages": [{"role": "user", "content": user_prompt}]
     }).encode()
@@ -1518,25 +1526,50 @@ Rules that cannot be broken:
 
 projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
 
-You are a Federal Reserve staff economist writing an internal briefing document
-for FOMC members — not for public release. The audience is the Federal Open Market
-Committee - they already understand monetary policy mechanics. Especifically, you're writing the writing the inflation outlook for Tealbook A.
+You are a Federal Reserve staff economist writing the inflation outlook section of Tealbook A for the upcoming FOMC meeting.
 
-Search for the latest US inflation, energy, commodity, trade, and labor cost data
-before writing. Use only verifiable facts — do not invent events or policy actions.
+Use web search to retrieve only the most recent available data as of today for:
+- headline PCE inflation,
+- core PCE inflation,
+- headline CPI inflation,
+- core CPI inflation,
+- labor cost growth,
+- energy prices,
+- food prices,
+- nonfuel import prices.
 
-STYLE RULES:
-- Begin directly with the first sentence of the narrative. No preamble, no
-  "Based on my search..." or any meta-commentary about the task.
-- Declarative, third person, precise. No hedging phrases.
-- Technical language appropriate for FOMC staff briefing.
-- Do not explain what PCE is or how inflation is measured.
-- Do not reference "the Federal Reserve" or "the Committee" as external actors —
-  write as a staff member briefing the Committee from within.
-- 3 paragraphs: (1) current conditions and key drivers, (2) near-term path,
-  (3) medium-term outlook and risks. No section headers or labels.
+Prioritize official U.S. data releases. Use market or news sources only to supplement recent energy-price developments when official releases lag.
 
-After the narrative, fill in both tables in markdown. One decimal place. Single estimates only. For each column, mark with (f) if the data had not yet been released as of today and it's your forecast.
+Before writing, determine internally:
+1. the latest reading on headline PCE,
+2. the latest reading on core PCE,
+3. the main current driver of headline inflation,
+4. the main current driver of core inflation,
+5. the most likely near-term path,
+6. the most likely medium-term path,
+7. the main upside risks,
+8. the main downside risks.
+
+Do not output that internal reasoning. Output only the final narrative and tables.
+
+Write exactly 3 paragraphs:
+- Paragraph 1: current inflation conditions and drivers.
+- Paragraph 2: near-term outlook.
+- Paragraph 3: medium-term outlook and risks.
+
+Style rules:
+- The first sentence must be substantive economic analysis.
+- No preamble, no meta-commentary, no mention of search or sources.
+- No “Based on my research,” “Here is,” “I will,” or similar phrases.
+- Formal internal staff tone, compact and analytical.
+- Anchor on PCE.
+- Distinguish headline from core.
+- Distinguish temporary relative-price shocks from underlying inflation.
+
+After the narrative, fill in both tables in markdown.
+- One decimal place.
+- Single estimates only.
+- Mark forecasted values with (f).
 
 **TABLE 1 — Annual projections (Percent change at annual rate from final quarter of preceding period):**
 
@@ -1555,9 +1588,10 @@ After the narrative, fill in both tables in markdown. One decimal place. Single 
 | PCE price index | | | | | | |
 | Excluding food and energy | | | | | | |
 
-* Core goods imports exclude computers, semiconductors, oil, and natural gas."""
+* Core goods imports exclude computers, semiconductors, oil, and natural gas.
+"""
 
-result = call_claude_search(projection_prompt, max_tokens=1800)
+result = call_claude_search(projection_prompt, max_tokens=2200)
 display(Markdown(result))
 
 ```
