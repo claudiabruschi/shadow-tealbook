@@ -1485,7 +1485,7 @@ _f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
 from IPython.display import display, Markdown
 import json, urllib.request, os
 
-def call_claude_search_inflation(user_prompt, max_tokens=1800):
+def call_claude_search(user_prompt, max_tokens=1800):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
         return "_[LLM unavailable]_"
@@ -1557,7 +1557,7 @@ After the narrative, fill in both tables in markdown. One decimal place. Single 
 
 * Core goods imports exclude computers, semiconductors, oil, and natural gas."""
 
-result = call_claude_search(projection_prompt, max_tokens=1200)
+result = call_claude_search(projection_prompt, max_tokens=1800)
 display(Markdown(result))
 
 ```
