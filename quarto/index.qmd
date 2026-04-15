@@ -1405,7 +1405,7 @@ ahe      = pull_series('CES0500000003',         start=DATA_START).dropna().pct_c
 compnfb  = pull_series('COMPNFB',              start=DATA_START).dropna().pct_change(4).mul(100).dropna()
 brent    = pull_series('DCOILBRENTEU',          start=DATA_START).dropna().resample('MS').mean().dropna()
 crb_prx  = pull_series('PALLFNFINDEXM',               start=DATA_START).dropna()
-pce_eng  = pull_series('DPCERG3M086SBEA', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+pce_eng  = pull_series('DNRGRG3M086SBEA', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 imp_core = pull_series('IREXFDFLS',       start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 tips_fwd = pull_series('T5YIFRM',              start=DATA_START).dropna()
 clev10   = pull_series('EXPINF10YR',           start=DATA_START).dropna()
