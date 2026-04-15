@@ -1485,7 +1485,7 @@ _f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
 from IPython.display import display, Markdown
 import json, urllib.request, os
 
-def call_claude_search(user_prompt, max_tokens=1200):
+def call_claude_search(user_prompt, max_tokens=1500):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
         return "_[LLM unavailable — set ANTHROPIC_API_KEY]_"
@@ -1512,12 +1512,25 @@ def call_claude_search(user_prompt, max_tokens=1200):
 
 projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
 
-You are a Federal Reserve staff economist writing the inflation outlook for Tealbook A.
-Search for the most recent data on US inflation, energy and commodity prices, trade, and labor costs
-before writing. Use only facts you can verify — do not invent specific events or policy actions.
+You are a Federal Reserve staff economist writing an internal briefing document
+for FOMC members — not for public release. The audience is the Federal Open Market
+Committee - they already understand monetary policy mechanics. Especifically, you're writing the writing the inflation outlook for Tealbook A.
 
-Write the inflation outlook narrative in Tealbook style: continuous prose, no bullets, no section labels. Be specific — name actual current factors and events, not generic language.
-Then fill in both tables in markdown. One decimal place. Single estimates only. For each column, mark with (f) if the data had not yet been released as of today and it's your forecast.
+Search for the latest US inflation, energy, commodity, trade, and labor cost data
+before writing. Use only verifiable facts — do not invent events or policy actions.
+
+STYLE RULES:
+- Begin directly with the first sentence of the narrative. No preamble, no
+  "Based on my search..." or any meta-commentary about the task.
+- Declarative, third person, precise. No hedging phrases.
+- Technical language appropriate for FOMC staff briefing.
+- Do not explain what PCE is or how inflation is measured.
+- Do not reference "the Federal Reserve" or "the Committee" as external actors —
+  write as a staff member briefing the Committee from within.
+- 3 paragraphs: (1) current conditions and key drivers, (2) near-term path,
+  (3) medium-term outlook and risks. No section headers or labels.
+
+After the narrative, fill in both tables in markdown. One decimal place. Single estimates only. For each column, mark with (f) if the data had not yet been released as of today and it's your forecast.
 
 **TABLE 1 — Annual projections (Percent change at annual rate from final quarter of preceding period):**
 
