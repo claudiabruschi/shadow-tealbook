@@ -1390,90 +1390,28 @@ show(figF, 'Source: DOL (IC4WSA) via FRED')
 ## Inflation
 
 ```{python}
-#| label: inflation-narrative
-#| output: asis
+#| label: inflation-data
+#| include: false
 
-from datetime import datetime
-import json, urllib.request, os
-
-# ── Date-derived period labels ────────────────────────────────────────────────
-_today      = datetime.today()
-_yr         = _today.year
-_prev_yr    = _yr - 1
-_next_yr    = _yr + 1
-_far_yr     = _yr + 2
-
-# Three most recent months + three ahead (approximate — no release calendar)
 from dateutil.relativedelta import relativedelta
-_m = [(_today - relativedelta(months=i)).strftime("%b %Y") for i in range(2, -1, -1)]
-_f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
-
-projection_prompt = f"""
-Today is {_today.strftime("%B %d, %Y")}.
-
-You are a Federal Reserve staff economist preparing the inflation outlook
-section of Tealbook A for the upcoming FOMC meeting.
-
-Your task has two parts.
-
-PART 1 — Write the inflation outlook narrative in Tealbook style.
-The narrative should:
-- discuss current inflation conditions,
-- explain the near-term outlook,
-- explain the medium-term outlook,
-- distinguish temporary from persistent forces,
-- mention key upside and downside risks.
-
-PART 2 — Fill in both tables below.
-One decimal place. Single estimates only. No ranges.
-
-TABLE 1 — Annual projections (Q4/Q4, percent change at annual rate):
-
-                                {_prev_yr}   {_yr}   {_next_yr}   {_far_yr}
-PCE price index
-  Food and beverages
-  Energy
-  Excluding food and energy
-  Core goods imports*
-
-TABLE 2 — Monthly projections (12-month percent change):
-
-                    {_m[0]}   {_m[1]}   {_m[2]}   {_f[0]}   {_f[1]}   {_f[2]}
-PCE price index
-Excluding food and energy
-
-* Core goods imports exclude computers, semiconductors, oil, and natural gas.
-"""
-
-print(call_claude(projection_prompt, max_tokens=800))
-```
-
-```{python}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ```{python}
-# #| label: inflation-data
-# #| include: false
-# ─────────────────────────────────────────────────────────────────────────────
 
 cpi      = pull_series('CPIAUCSL',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 pce      = pull_series('PCEPI',                start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 core_pce = pull_series('PCEPILFE',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
-trim_pce = pull_series('PCETRIM12M159SFRBDAL', start=DATA_START).dropna()         # already 12-mo % YoY
+trim_pce = pull_series('PCETRIM12M159SFRBDAL', start=DATA_START).dropna()
 mkt_pce  = pull_series('DPCXRG3M086SBEA',      start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 eci      = pull_series('ECIWAG',               start=DATA_START).dropna().pct_change(4).mul(100).dropna()
 ahe      = pull_series('CES0500000003',         start=DATA_START).dropna().pct_change(12).mul(100).dropna()
 compnfb  = pull_series('COMPNFB',              start=DATA_START).dropna().pct_change(4).mul(100).dropna()
 brent    = pull_series('DCOILBRENTEU',          start=DATA_START).dropna().resample('MS').mean().dropna()
-crb_prx  = pull_series('PPIACO',               start=DATA_START).dropna()         # level, proxy for CRB
-cpi_eng  = pull_series('CPIENGSL',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
-imp_core = pull_series('IREXFDFLS', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
-tips_fwd = pull_series('T5YIFRM',             start=DATA_START).dropna()
+crb_prx  = pull_series('PALLFNFINDEXM',               start=DATA_START).dropna()
+pce_eng  = pull_series('DPCERG3M086SBEA', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+imp_core = pull_series('IREXFDFLS',       start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+tips_fwd = pull_series('T5YIFRM',              start=DATA_START).dropna()
 clev10   = pull_series('EXPINF10YR',           start=DATA_START).dropna()
-mich1yr  = pull_series('MICH',                start=DATA_START).dropna()
-recession = pull_series('USREC',              start=DATA_START)
- 
-# ── Latest values & date labels ──────────────────────────────────────────────
+mich1yr  = pull_series('MICH',                 start=DATA_START).dropna()
+recession= pull_series('USREC',               start=DATA_START)
+
 cpi_latest      = cpi.iloc[-1];       cpi_date_inf    = month_label(pd.Timestamp(cpi.index[-1]))
 pce_latest      = pce.iloc[-1];       pce_date_inf    = month_label(pd.Timestamp(pce.index[-1]))
 core_latest     = core_pce.iloc[-1];  core_date_inf   = month_label(pd.Timestamp(core_pce.index[-1]))
@@ -1483,15 +1421,14 @@ eci_latest      = eci.iloc[-1];       eci_date        = quarter_label(pd.Timesta
 ahe_latest      = ahe.iloc[-1];       ahe_date        = month_label(pd.Timestamp(ahe.index[-1]))
 compnfb_latest  = compnfb.iloc[-1];   compnfb_date    = quarter_label(pd.Timestamp(compnfb.index[-1]))
 brent_latest    = brent.iloc[-1];     brent_date      = month_label(pd.Timestamp(brent.index[-1]))
-cpi_eng_latest  = cpi_eng.iloc[-1];   cpi_eng_date    = month_label(pd.Timestamp(cpi_eng.index[-1]))
-imp_core_latest = imp_core.iloc[-1];  imp_core_date   = month_label(pd.Timestamp(imp_core.index[-1]))
+pce_eng_latest  = pce_eng.iloc[-1];  pce_eng_date  = month_label(pd.Timestamp(pce_eng.index[-1]))
+imp_core_latest = imp_core.iloc[-1]; imp_core_date = month_label(pd.Timestamp(imp_core.index[-1]))
 tips_latest     = tips_fwd.iloc[-1];  tips_date       = month_label(pd.Timestamp(tips_fwd.index[-1]))
 clev10_latest   = clev10.iloc[-1];    clev10_date     = month_label(pd.Timestamp(clev10.index[-1]))
 mich1yr_latest  = mich1yr.iloc[-1];   mich1yr_date    = month_label(pd.Timestamp(mich1yr.index[-1]))
- 
+
 # ── Shared helpers ────────────────────────────────────────────────────────────
 def recession_shapes(rec_series, chart_start):
-    """NBER recession gray bands for Plotly layout shapes list."""
     rec = rec_series[chart_start:].copy()
     shapes, in_rec, start_date = [], False, None
     for date, val in rec.items():
@@ -1509,306 +1446,226 @@ def recession_shapes(rec_series, chart_start):
                            fillcolor='#C8C8C8', opacity=0.35,
                            line_width=0, layer='below'))
     return shapes
- 
-def end_label(fig, series, color, text, xshift=6, yshift=0, yref='y'):
-    """Floating end-of-series annotation matching Tealbook label style."""
-    fig.add_annotation(
-        x=series.index[-1], y=float(series.iloc[-1]),
-        yref=yref, text=f'<b>{text}</b>',
-        showarrow=False, xanchor='left',
-        xshift=xshift, yshift=yshift,
-        font=dict(color=color, size=8))
- 
+
 def x_end(series, extra_months=5):
-    """Extend x-axis slightly beyond last data point."""
     return (pd.Timestamp(series.index[-1]) + pd.DateOffset(months=extra_months)).strftime('%Y-%m-%d')
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# ```{python}
-# #| label: plot-inflation-row1
+
+# ── Date-derived labels for projection table ──────────────────────────────────
+_today   = TODAY
+_yr      = _today.year
+_prev_yr = _yr - 1
+_next_yr = _yr + 1
+_far_yr  = _yr + 2
+_h1      = f"H1 {_yr}"
+_h2      = f"H2 {_yr}"
+_m = [(_today - relativedelta(months=i)).strftime("%b %Y") for i in range(2, -1, -1)]
+_f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
+```
+
+```{python}
+#| label: inflation-narrative
+#| output: asis
+from IPython.display import display, Markdown
+
+projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
+
+You are a Federal Reserve staff economist preparing the inflation outlook
+section of Tealbook A for the upcoming FOMC meeting.
+
+Your task has two parts.
+
+PART 1 — Write the inflation outlook narrative in Tealbook style.
+Be specific — name actual current factors and events, not generic language.
+Do not use placeholder phrases like "geopolitical tensions" without naming what they are.
+Cover: current conditions, near-term path, medium-term convergence, key risks.
+
+PART 2 — Fill in both tables using markdown table format.
+
+**TABLE 1 — Annual projections (Q4/Q4, percent change at annual rate):**
+
+| Measure | {_prev_yr} | {_yr} | {_next_yr} | {_far_yr} |
+|---|---|---|---|---|
+| PCE price index | | | | |
+| &nbsp;&nbsp;Food and beverages | | | | |
+| &nbsp;&nbsp;Energy | | | | |
+| &nbsp;&nbsp;Excluding food and energy | | | | |
+| &nbsp;&nbsp;Core goods imports* | | | | |
+
+**TABLE 2 — Monthly projections (12-month percent change):**
+
+| Measure | {_m[0]} | {_m[1]} | {_m[2]} | {_f[0]} | {_f[1]} | {_f[2]} |
+|---|---|---|---|---|---|---|
+| PCE price index | | | | | | |
+| Excluding food and energy | | | | | | |
+
+Fill in all empty cells. One decimal place. Single estimates only.
+* Core goods imports exclude computers, semiconductors, oil, and natural gas.
+Forecast months (staff estimates): {_f[0]}, {_f[1]}, {_f[2]}"""
+
+result = call_claude(projection_prompt, max_tokens=1200)
+display(Markdown(result))
+```
+
+```{python}
+#| label: plot-inflation-1
+
 # ROW 1 — Chart 1: Headline CPI & PCE  |  Chart 2: Core PCE Measures
-# ─────────────────────────────────────────────────────────────────────────────
- 
-# ── Chart 1 ──────────────────────────────────────────────────────────────────
 fn = next_fig()
 fig1 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig1.add_shape(**s)
- 
 fig1.add_trace(go.Scatter(
     x=cpi[CHART_START:].index, y=cpi[CHART_START:].values,
-    name='CPI', line=line(C2),       # red in original
-    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
+    name='CPI', line=line(C2),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
 fig1.add_trace(go.Scatter(
     x=pce[CHART_START:].index, y=pce[CHART_START:].values,
-    name='PCE', line=line(C1),       # black in original
-    hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
- 
+    name='PCE', line=line(C1),
+    hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
 fig1.add_hline(y=0, line_color='black', line_width=0.8)
- 
-end_label(fig1, cpi[CHART_START:], C2, f'{cpi_date_inf}<br>{cpi_latest:.1f}')
-end_label(fig1, pce[CHART_START:], C1, f'{pce_date_inf} (e)<br>{pce_latest:.1f}')
- 
-layout1 = base_layout(
-    f'Figure {fn} — Headline Consumer Price Inflation',
-    subtitle='Percent change from year earlier',
-    start=CHART_START)
+layout1 = base_layout(f'Figure {fn} — Headline Consumer Price Inflation',
+    subtitle='Percent change from year earlier', start=CHART_START)
 fig1.update_layout(**layout1)
 fig1.update_yaxes(ticksuffix='%')
 fig1.update_xaxes(range=[CHART_START, x_end(cpi)])
- 
-show(fig1,
-     'Note: PCE prices for recent months may be staff estimates (e). '
-     'Gray shaded bars indicate NBER recessions.<br>'
-     'Source: BLS (CPIAUCSL); BEA (PCEPI) via FRED.')
- 
-# ── Chart 2 ──────────────────────────────────────────────────────────────────
-fn = next_fig()
+
+fn2 = next_fig()
 fig2 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig2.add_shape(**s)
- 
 fig2.add_trace(go.Scatter(
     x=trim_pce[CHART_START:].index, y=trim_pce[CHART_START:].values,
     name='Trimmed mean PCE', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig2.add_trace(go.Scatter(
     x=mkt_pce[CHART_START:].index, y=mkt_pce[CHART_START:].values,
-    name='Market-based PCE ex food & energy', line=line(C2),
+    name='Market-based PCE excluding food and energy', line=line(C2),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig2.add_trace(go.Scatter(
     x=core_pce[CHART_START:].index, y=core_pce[CHART_START:].values,
-    name='PCE ex food & energy', line=line(C3),
+    name='PCE excluding food and energy', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
- 
 fig2.add_hline(y=2.0, line_color=C3, line_dash='dot', line_width=1.0,
-               annotation_text='2%', annotation_position='top right',
-               annotation_font=dict(size=8, color=C3))
- 
-end_label(fig2, trim_pce[CHART_START:],  C1, f'{trim_date}<br>{trim_latest:.1f}')
-end_label(fig2, mkt_pce[CHART_START:],   C2, f'{mkt_date} (e)<br>{mkt_latest:.1f}')
-end_label(fig2, core_pce[CHART_START:],  C3, f'{core_date_inf} (e)<br>{core_latest:.1f}')
- 
-layout2 = base_layout(
-    f'Figure {fn} — Measures of Core PCE Price Inflation',
-    subtitle='Percent change from year earlier',
-    start=CHART_START)
+    annotation_text='2%', annotation_position='top right',
+    annotation_font=dict(size=8, color=C3))
+layout2 = base_layout(f'Figure {fn2} — Measures of Underlying PCE Price Inflation',
+    subtitle='Percent change from year earlier', start=CHART_START)
 fig2.update_layout(**layout2)
 fig2.update_yaxes(ticksuffix='%')
 fig2.update_xaxes(range=[CHART_START, x_end(core_pce)])
- 
-show(fig2,
-     'Note: Core PCE prices for recent months may be staff estimates (e).<br>'
-     'Source: Dallas Fed (PCETRIM12M159SFRBDAL); BEA (DPCXRG3M086SBEA, PCEPILFE) via FRED.',
-     flush=True)   # ← renders row 1 (charts 1 & 2)
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# ```{python}
-# #| label: plot-inflation-row2
-# ROW 2 — Chart 3: Labor Cost Growth  |  Chart 4: Commodity & Oil Price Levels
-# ─────────────────────────────────────────────────────────────────────────────
- 
-# ── Chart 3 ──────────────────────────────────────────────────────────────────
-fn = next_fig()
+
+show(fig1, 'Source: BLS (CPIAUCSL); BEA (PCEPI) via FRED.')
+show(fig2, 'Source: Dallas Fed (PCETRIM12M159SFRBDAL); BEA (DPCXRG3M086SBEA, PCEPILFE) via FRED.')
+```
+
+```{python}
+#| label: plot-inflation-2
+
+# ROW 2 — Chart 3: Labor Cost Growth  |  Chart 4: Commodity & Oil Prices
+fn3 = next_fig()
 fig3 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig3.add_shape(**s)
- 
-# Forward-fill quarterly series to monthly for smooth rendering
 eci_m     = eci.resample('MS').ffill()[CHART_START:]
 compnfb_m = compnfb.resample('MS').ffill()[CHART_START:]
- 
-fig3.add_trace(go.Scatter(
-    x=eci_m.index, y=eci_m.values,
+fig3.add_trace(go.Scatter(x=eci_m.index, y=eci_m.values,
     name='Employment cost index', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
-fig3.add_trace(go.Scatter(
-    x=ahe[CHART_START:].index, y=ahe[CHART_START:].values,
-    name='Average hourly earnings', line=line(C2),
+fig3.add_trace(go.Scatter(x=ahe[CHART_START:].index, y=ahe[CHART_START:].values,
+    name='Avg hourly earnings', line=line(C2),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
-fig3.add_trace(go.Scatter(
-    x=compnfb_m.index, y=compnfb_m.values,
+fig3.add_trace(go.Scatter(x=compnfb_m.index, y=compnfb_m.values,
     name='Compensation per hour', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
- 
 fig3.add_hline(y=0, line_color='black', line_width=0.8)
- 
-end_label(fig3, eci_m,             C1, f'{eci_date}<br>{eci_latest:.1f}')
-end_label(fig3, ahe[CHART_START:], C2, f'{ahe_date}<br>{ahe_latest:.1f}')
-end_label(fig3, compnfb_m,         C3, f'{compnfb_date}<br>{compnfb_latest:.1f}')
- 
-layout3 = base_layout(
-    f'Figure {fn} — Labor Cost Growth',
-    subtitle='Percent change from year earlier',
-    start=CHART_START)
+layout3 = base_layout(f'Figure {fn3} — Labor Cost Growth',
+    subtitle='Percent change from year earlier', start=CHART_START)
 fig3.update_layout(**layout3)
 fig3.update_yaxes(ticksuffix='%')
 fig3.update_xaxes(range=[CHART_START, x_end(ahe)])
- 
-show(fig3,
-     'Note: Compensation per hour (COMPNFB) is for the nonfarm business sector (quarterly). '
-     'Average hourly earnings (CES0500000003) is for the private nonfarm sector (monthly). '
-     'ECI (ECIWAG) is for the private sector (quarterly). '
-     'Gray shaded bars indicate NBER recessions.<br>'
-     'Source: BLS (ECIWAG, CES0500000003, COMPNFB) via FRED.')
- 
-# ── Chart 4 ──────────────────────────────────────────────────────────────────
-fn = next_fig()
+
+fn4 = next_fig()
 fig4 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig4.add_shape(**s)
- 
-fig4.add_trace(go.Scatter(
-    x=brent[CHART_START:].index, y=brent[CHART_START:].values,
-    name='Brent crude ($/bbl, left)', yaxis='y1',
-    line=line(C1),
+fig4.add_trace(go.Scatter(x=brent[CHART_START:].index, y=brent[CHART_START:].values,
+    name='Brent crude ($/bbl, left)', yaxis='y1', line=line(C1),
     hovertemplate='%{x|%b %Y}: $%{y:.1f}<extra></extra>'))
-fig4.add_trace(go.Scatter(
-    x=crb_prx[CHART_START:].index, y=crb_prx[CHART_START:].values,
-    name='PPI all commodities / CRB proxy (index, right)', yaxis='y2',
-    line=line(C3),
+fig4.add_trace(go.Scatter(x=crb_prx[CHART_START:].index, y=crb_prx[CHART_START:].values,
+    name='Global Price Index of All Commodities (index, right)', yaxis='y2', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.1f}<extra></extra>'))
- 
-end_label(fig4, brent[CHART_START:],  C1, f'{brent_date}<br>${brent_latest:.0f}')
- 
-layout4 = base_layout(
-    f'Figure {fn} — Commodity and Oil Price Levels',
-    subtitle='Dollars per barrel (left); PPI all commodities index, 1982=100 (right)',
-    start=CHART_START,
-    r_margin=55)
-layout4['yaxis'] = dict(
-    showgrid=True, gridcolor='#eeeeee', zeroline=False,
+layout4 = base_layout(f'Figure {fn4} — Commodity and Oil Price Levels',
+    subtitle='Dollars per barrel (left); Global Price Index 2016 = 10 (right)',
+    start=CHART_START, r_margin=55)
+layout4['yaxis']  = dict(showgrid=True, gridcolor='#eeeeee', zeroline=False,
     tickprefix='$', tickfont=dict(size=9), autorange=True, side='left')
-layout4['yaxis2'] = dict(
-    overlaying='y', side='right', showgrid=False, zeroline=False,
-    tickfont=dict(size=9), autorange=True)
+layout4['yaxis2'] = dict(overlaying='y', side='right', showgrid=False,
+    zeroline=False, tickfont=dict(size=9), autorange=True)
 layout4['margin']['r'] = 55
 fig4.update_layout(**layout4)
 fig4.update_xaxes(range=[CHART_START, x_end(brent)])
- 
-show(fig4,
-     '⚠️ CRB Spot Commodity Price Index is not available in FRED. '
-     'PPI All Commodities (PPIACO, 1982=100) used as proxy for the right axis. '
-     'Futures price extension not shown.<br>'
-     'Source: EIA (DCOILBRENTEU); BLS (PPIACO) via FRED.',
-     flush=True)   # ← renders row 2 (charts 3 & 4)
- 
- 
-# ─────────────────────────────────────────────────────────────────────────────
-# ```{python}
-# #| label: plot-inflation-row3
-# ROW 3 — Chart 5: Energy & Import Price Inflation  |  Chart 6: LT Expectations
-# ─────────────────────────────────────────────────────────────────────────────
- 
-# ── Chart 5 ──────────────────────────────────────────────────────────────────
-fn = next_fig()
+
+show(fig3, 'Source: BLS (ECIWAG, CES0500000003, COMPNFB) via FRED.')
+show(fig4, 'Source: EIA (DCOILBRENTEU); IMF (PALLFNFINDEXM) via FRED.')
+```
+
+```{python}
+#| label: plot-inflation-3
+
+# ROW 3 — Chart 5: Energy & Import Prices  |  Chart 6: LT Expectations
+fn5 = next_fig()
 fig5 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig5.add_shape(**s)
- 
-# Left axis: core import prices (narrower range, ±20%)
+
 fig5.add_trace(go.Scatter(
     x=imp_core[CHART_START:].index, y=imp_core[CHART_START:].values,
-    name='Core import prices (left)', yaxis='y1',
-    line=line(C1),
+    name='Core import prices (left)', yaxis='y1', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
- 
-# Right axis: energy prices (wider range, ±60%)
+
 fig5.add_trace(go.Scatter(
-    x=cpi_eng[CHART_START:].index, y=cpi_eng[CHART_START:].values,
-    name='CPI energy prices (right)', yaxis='y2',
-    line=line(C2),
+    x=pce_eng[CHART_START:].index, y=pce_eng[CHART_START:].values,
+    name='PCE energy prices (right)', yaxis='y2', line=line(C2),
     hovertemplate='%{x|%b %Y}: %{y:.1f}%<extra></extra>'))
- 
+
 fig5.add_hline(y=0, line_color='black', line_width=0.8, yref='y')
- 
-end_label(fig5, imp_core[CHART_START:], C1,
-          f'{imp_core_date}<br>{imp_core_latest:.1f}')
-end_label(fig5, cpi_eng[CHART_START:],  C2,
-          f'{cpi_eng_date}<br>{cpi_eng_latest:.1f}',
-          yref='y2')
- 
-layout5 = base_layout(
-    f'Figure {fn} — Energy and Import Price Inflation',
+
+layout5 = base_layout(f'Figure {fn5} — Energy and Import Price Inflation',
     subtitle='Percent change from year earlier',
-    start=CHART_START,
-    r_margin=55)
-layout5['yaxis'] = dict(
-    title=dict(text='Import prices (%)', font=dict(size=8, color=C1)),
-    showgrid=True, gridcolor='#eeeeee', zeroline=False,
+    start=CHART_START, r_margin=55)
+layout5['yaxis']  = dict(showgrid=True, gridcolor='#eeeeee', zeroline=False,
     ticksuffix='%', tickfont=dict(size=9), autorange=True, side='left')
-layout5['yaxis2'] = dict(
-    title=dict(text='Energy prices (%)', font=dict(size=8, color=C2)),
-    overlaying='y', side='right', showgrid=False, zeroline=False,
-    ticksuffix='%', tickfont=dict(size=9), autorange=True)
+layout5['yaxis2'] = dict(overlaying='y', side='right', showgrid=False,
+    zeroline=False, ticksuffix='%', tickfont=dict(size=9), autorange=True)
 layout5['margin']['r'] = 55
 fig5.update_layout(**layout5)
-fig5.update_xaxes(range=[CHART_START, x_end(cpi_eng)])
- 
-show(fig5,
-     '⚠️ CPI Energy (CPIENGSL, right axis) proxies PCE energy prices — no single '
-     'PCE energy total price index is available in FRED. '
-     'Core import prices = BLS non-fuel import price index (IRM, left axis), '
-     'closest proxy for Tealbook\'s "core imports ex petroleum, computers, semis". '
-     'A tariff-effect caveat note is shown in the original Tealbook.<br>'
-     'Source: BLS (IRM, CPIENGSL) via FRED.')
- 
-# ── Chart 6 ──────────────────────────────────────────────────────────────────
-fn = next_fig()
+fig5.update_xaxes(range=[CHART_START, x_end(pce_eng)])
+
+fn6 = next_fig()
 fig6 = go.Figure()
- 
 for s in recession_shapes(recession, CHART_START):
     fig6.add_shape(**s)
- 
-# 5yr/5yr TIPS forward compensation: red (most prominent)
-fig6.add_trace(go.Scatter(
-    x=tips_fwd[CHART_START:].index, y=tips_fwd[CHART_START:].values,
+fig6.add_trace(go.Scatter(x=tips_fwd[CHART_START:].index, y=tips_fwd[CHART_START:].values,
     name='5-to-10yr TIPS compensation', line=line(C2),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
- 
-# Cleveland Fed 10-yr median (proxy for SPF PCE next 10 years): black
-fig6.add_trace(go.Scatter(
-    x=clev10[CHART_START:].index, y=clev10[CHART_START:].values,
-    name='Cleveland Fed median next 10 years', line=line(C1),
+fig6.add_trace(go.Scatter(x=clev10[CHART_START:].index, y=clev10[CHART_START:].values,
+    name='Cleveland Fed median 10-yr', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
- 
-# Michigan 1-yr median (⚠️ proxy for Michigan 5-10yr): gray
-fig6.add_trace(go.Scatter(
-    x=mich1yr[CHART_START:].index, y=mich1yr[CHART_START:].values,
-    name='Michigan median next year*', line=line(C3),
+fig6.add_trace(go.Scatter(x=mich1yr[CHART_START:].index, y=mich1yr[CHART_START:].values,
+    name='Michigan 1-yr median', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
- 
 fig6.add_hline(y=2.0, line_color=C3, line_dash='dot', line_width=1.0,
-               annotation_text='2%', annotation_position='bottom right',
-               annotation_font=dict(size=8, color=C3))
- 
-end_label(fig6, tips_fwd[CHART_START:], C2, f'{tips_date}<br>{tips_latest:.2f}')
-end_label(fig6, clev10[CHART_START:],   C1, f'{clev10_date}<br>{clev10_latest:.2f}')
-end_label(fig6, mich1yr[CHART_START:],  C3, f'{mich1yr_date}<br>{mich1yr_latest:.2f}')
- 
-layout6 = base_layout(
-    f'Figure {fn} — Long-Term Inflation Expectations and Compensation',
-    subtitle='Percent',
-    start=CHART_START)
+    annotation_text='2%', annotation_position='bottom right',
+    annotation_font=dict(size=8, color=C3))
+layout6 = base_layout(f'Figure {fn6} — Long-Term Inflation Expectations',
+    subtitle='Percent', start=CHART_START)
 fig6.update_layout(**layout6)
 fig6.update_yaxes(ticksuffix='%')
 fig6.update_xaxes(range=[CHART_START, x_end(tips_fwd)])
- 
-show(fig6,
-     '*Michigan series shown is 1-yr median (MICH) — the 5-to-10yr Michigan series '
-     '(UMICH5YRINFEXP) has data gaps in FRED. Cleveland Fed 10-yr median '
-     '(EXPINF10YR) proxies SPF PCE median next 10 years (not available as FRED series).<br>'
-     'Source: FRB (T5YIFRM); Cleveland Fed (EXPINF10YR); U. of Michigan (MICH) via FRED. '
-     'Based on a comparison of an estimated TIPS Treasury yield curve with an estimated '
-     'nominal off-the-run Treasury yield curve, with an adjustment for the indexation-lag effect.',
-     flush=True)   # ← renders row 3 (charts 5 & 6)
+
+show(fig5, 'Source: BEA (PCEPILFE, IREXFDFLS) via FRED.')
+show(fig6, 'Source: FRB (T5YIFRM); Cleveland Fed (EXPINF10YR); U. of Michigan (MICH) via FRED.',
+     flush=True)
 ```
 
 ---
