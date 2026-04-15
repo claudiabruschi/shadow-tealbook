@@ -352,6 +352,7 @@ display(HTML(tbl_html))
 #| label: overview-narrative
 #| output: asis
 
+"""
 prompt = f"""Current economic conditions as of {now_str}:
 - Real GDP growth ({gdp_date}, SAAR): {gdp_latest:.1f}%; prior quarter ({gdp_prev_date}): {gdp_prev:.1f}%
 - Unemployment rate ({unrate_date}): {unrate_latest:.1f}%; natural rate: {nrou_latest:.1f}%; gap: {ugap:+.1f} pp
@@ -366,6 +367,8 @@ Paragraph 2: inflation and financial conditions.
 Every sentence must include the specific time period it references."""
 
 print(call_claude(prompt))
+"""
+
 ```
 
 ```{python}
@@ -705,6 +708,8 @@ beige_text, beige_date = fetch_beige_book()
 #| label: gdp-narrative-1
 #| output: asis
 
+"""
+
 pdfp_now_str = f'{pdfp_now:+.1f}' if pdfp_now else 'n/a'
 
 prompt_1 = f"""
@@ -737,12 +742,15 @@ Write exactly 1 paragraph (4 sentences):
 4. State the SPF forecast for {q_next} and whether it implies firming or moderation relative to {q_now}.
 """
 print(call_claude(prompt_1, max_tokens=320))
+"""
+
 ```
 
 ```{python}
 #| label: gdp-narrative-2
 #| output: asis
 
+"""
 prompt_2 = f"""
 You are a Federal Reserve staff economist writing the GDP & Output section of Tealbook A.
 ANCHORING RULE:
@@ -766,12 +774,15 @@ Paragraph 2:
 Explain the role of inventories and net exports in {q_now}, and whether they materially distort headline GDP relative to underlying demand.
 """
 print(call_claude(prompt_2, max_tokens=320))
+"""
+
 ```
 
 ```{python}
 #| label: gdp-narrative-3
 #| output: asis
 
+"""
 prompt_3 = f"""
 You are a Federal Reserve staff economist writing Tealbook A.
 ANCHORING RULE:
@@ -798,12 +809,15 @@ Paragraph 2:
 Describe the outlook for residential investment in {q_now} and {q_next}, noting whether activity appears to be stabilizing or continuing to contract.
 """
 print(call_claude(prompt_3, max_tokens=340))
+"""
+
 ```
 
 ```{python}
 #| label: gdp-narrative-4
 #| output: asis
 
+"""
 prompt_4 = f"""
 You are a Federal Reserve staff economist writing Tealbook A.
 ANCHORING RULE:
@@ -848,6 +862,8 @@ All values below are in chained dollars (SAAR), enabling direct comparison.
 Do not mix percentage point contributions with chained dollar levels in the same sentence.
 """
 print(call_claude(prompt_4, max_tokens=450))
+"""
+
 ```
 
 ```{python}
@@ -958,12 +974,14 @@ display(HTML(f"""
   Inventories and net exports: realized contributions (pp) from BEA; SPF quarterly forecasts from Philadelphia Fed RCBI/REXPORT Level files.
   Italicized row: CBO potential GDP growth rate (GDPPOT).
 </p>"""))
+
 ```
 
 ```{python}
 #| label: gdp-narrative-5
 #| output: asis
 
+"""
 prompt_5 = f"""
 You are a Federal Reserve staff economist writing Tealbook A.
 ANCHORING RULE:
@@ -987,12 +1005,15 @@ TASK — Write exactly 1 paragraph (3 complete sentences):
    each tied to a named GDP component.
 """
 print(call_claude(prompt_5, max_tokens=260))
+"""
+
 ```
 
 ```{python}
 #| label: gdp-narrative-6-bb
 #| output: asis
 
+"""
 if not beige_text:
     print('*[Beige Book unavailable — contextual note skipped.]*')
 else:
@@ -1021,6 +1042,7 @@ If no concrete driver is identifiable, return exactly: OMIT
     result = call_claude(prompt_bb, max_tokens=120).strip()
     if result.upper() != 'OMIT':
         print(f'\n*{result}*\n')
+"""
 ```
 
 ```{python}
@@ -1280,6 +1302,7 @@ claims_date    = month_label(pd.Timestamp(claims.index[-1]))
 #| label: labor-narrative
 #| output: asis
 
+"""
 prompt = f"""Labor market data:
 - Unemployment rate ({unrate_date}): {unrate_latest:.1f}%; natural rate: {nrou_latest:.1f}%; gap: {ugap:+.1f} pp
 - Nonfarm payrolls — 3-month avg through {payroll_date}: {payroll_3m:,.0f}K; 12-month avg: {payroll_12m:,.0f}K
@@ -1293,6 +1316,8 @@ Paragraph 2: wage growth, participation, and the outlook vs. FOMC longer-run.
 Every sentence must name the specific month or period it references."""
 
 print(call_claude(prompt))
+"""
+
 ```
 
 ```{python}
@@ -1466,22 +1491,43 @@ _f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
 #| label: inflation-narrative
 #| output: asis
 from IPython.display import display, Markdown
+import json, urllib.request, os
+
+def call_claude_search(user_prompt, max_tokens=1200):
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        return "_[LLM unavailable — set ANTHROPIC_API_KEY]_"
+    payload = json.dumps({
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": max_tokens,
+        "system": TEALBOOK_SYSTEM,
+        "tools": [{"type": "web_search_20250305", "name": "web_search"}],
+        "messages": [{"role": "user", "content": user_prompt}]
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={"Content-Type": "application/json",
+                 "x-api-key": api_key,
+                 "anthropic-version": "2023-06-01"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            blocks = json.loads(resp.read())["content"]
+            return ' '.join(b["text"] for b in blocks if b["type"] == "text").strip()
+    except Exception as e:
+        return f"_[LLM call failed: {e}]_"
 
 projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
 
-You are a Federal Reserve staff economist preparing the inflation outlook
-section of Tealbook A for the upcoming FOMC meeting.
+You are a Federal Reserve staff economist writing the inflation outlook for Tealbook A.
+Search for the most recent data on US inflation, energy and commodity prices, trade, and labor costs
+before writing. Use only facts you can verify — do not invent specific events or policy actions.
 
-Your task has two parts.
+Write the inflation outlook narrative in Tealbook style: continuous prose, no bullets, no section labels. Be specific — name actual current factors and events, not generic language.
+Then fill in both tables in markdown. One decimal place. Single estimates only. For each column, mark with (f) if the data had not yet been released as of today and it's your forecast.
 
-PART 1 — Write the inflation outlook narrative in Tealbook style.
-Be specific — name actual current factors and events, not generic language.
-Do not use placeholder phrases like "geopolitical tensions" without naming what they are.
-Cover: current conditions, near-term path, medium-term convergence, key risks.
-
-PART 2 — Fill in both tables using markdown table format.
-
-**TABLE 1 — Annual projections (Q4/Q4, percent change at annual rate):**
+**TABLE 1 — Annual projections (Percent change at annual rate from final quarter of preceding period):**
 
 | Measure | {_prev_yr} | {_yr} | {_next_yr} | {_far_yr} |
 |---|---|---|---|---|
@@ -1498,12 +1544,11 @@ PART 2 — Fill in both tables using markdown table format.
 | PCE price index | | | | | | |
 | Excluding food and energy | | | | | | |
 
-Fill in all empty cells. One decimal place. Single estimates only.
-* Core goods imports exclude computers, semiconductors, oil, and natural gas.
-Forecast months (staff estimates): {_f[0]}, {_f[1]}, {_f[2]}"""
+* Core goods imports exclude computers, semiconductors, oil, and natural gas."""
 
-result = call_claude(projection_prompt, max_tokens=1200)
+result = call_claude_search(projection_prompt, max_tokens=1200)
 display(Markdown(result))
+
 ```
 
 ```{python}
@@ -1646,13 +1691,13 @@ fig6 = go.Figure()
 for s in recession_shapes(recession, CHART_START):
     fig6.add_shape(**s)
 fig6.add_trace(go.Scatter(x=tips_fwd[CHART_START:].index, y=tips_fwd[CHART_START:].values,
-    name='5-to-10yr TIPS compensation', line=line(C2),
+    name='5-to-10-year-ahead TIPS compensation', line=line(C2),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig6.add_trace(go.Scatter(x=clev10[CHART_START:].index, y=clev10[CHART_START:].values,
     name='Cleveland Fed median 10-yr', line=line(C1),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig6.add_trace(go.Scatter(x=mich1yr[CHART_START:].index, y=mich1yr[CHART_START:].values,
-    name='Michigan 1-yr median', line=line(C3),
+    name='Michigan median next 12-m', line=line(C3),
     hovertemplate='%{x|%b %Y}: %{y:.2f}%<extra></extra>'))
 fig6.add_hline(y=2.0, line_color=C3, line_dash='dot', line_width=1.0,
     annotation_text='2%', annotation_position='bottom right',
@@ -1807,6 +1852,7 @@ papers   = fetch_feds_papers()
 #| label: special-narrative
 #| output: asis
 
+"""
 speech_lines = "\n".join(
     f"- [{s['date']}] {s['speaker']}: \"{s['title']}\""
     for s in speeches) or "- No speeches retrieved"
@@ -1829,6 +1875,7 @@ Number them clearly."""
 
 print("### Suggested Special Topics\n")
 print(call_claude(prompt, max_tokens=550))
+"""
 ```
 
 ```{python}
