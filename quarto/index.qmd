@@ -1478,146 +1478,97 @@ _h2      = f"H2 {_yr}"
 _m = [(_today - relativedelta(months=i)).strftime("%b %Y") for i in range(2, -1, -1)]
 _f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
 ```
-
 ```{python}
 #| label: inflation-narrative
 #| output: asis
-
 from IPython.display import display, Markdown
-import json
-import urllib.request
-import os
-import re
+import json, urllib.request, os
 
-
-def call_claude_search(user_prompt, max_tokens=2200, timeout=90):
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+def call_claude_search(user_prompt, max_tokens=2200):
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
-        return "_[LLM unavailable: missing ANTHROPIC_API_KEY]_"
-
+        return "_[LLM unavailable]_"
     payload = json.dumps({
         "model": "claude-sonnet-4-20250514",
         "max_tokens": max_tokens,
-        "system": """You are a Federal Reserve staff economist drafting the inflation outlook section of Tealbook A.
+        "system": """You are a Federal Reserve staff economist drafting internal Tealbook A inflation prose.
 
-Write in the style of internal FOMC briefing material:
-- formal, compact, analytical
-- no meta-commentary
-- no mention of searching, sources, or the task
-- no public-facing explanations
-- first sentence must be substantive macroeconomic analysis
-- anchor on PCE inflation and distinguish headline from core
-- separate current conditions, near-term outlook, and medium-term outlook
-- distinguish temporary relative-price movements from underlying inflation pressure
-
-If available information is noisy or conflicting, prioritize official U.S. statistical releases and produce a coherent baseline narrative rather than a news summary.
-""",
+                    Write in the style of internal FOMC briefing material:
+                    - formal, compact, analytical;
+                    - no meta-commentary;
+                    - no mention of searching or sources;
+                    - no public-facing explanations;
+                    - first sentence must be substantive macroeconomic analysis;
+                    - anchor on PCE inflation and distinguish headline from core;
+                    - separate current conditions, near-term outlook, and medium-term outlook;
+                    - distinguish temporary relative-price movements from underlying inflation pressure.
+                    
+                    If tool results are noisy or conflicting, prioritize official U.S. statistical releases and produce a coherent baseline narrative rather than a news summary.
+                    """,
         "tools": [{"type": "web_search_20250305", "name": "web_search"}],
         "messages": [{"role": "user", "content": user_prompt}]
     }).encode()
-
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
+        headers={"Content-Type": "application/json",
+                 "x-api-key": api_key,
+                 "anthropic-version": "2023-06-01"}
     )
-
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            response = json.loads(resp.read())
-            blocks = response.get("content", [])
-            text = " ".join(
-                block["text"] for block in blocks
-                if block.get("type") == "text"
-            ).strip()
-            return text
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            blocks = json.loads(resp.read())["content"]
+            return ' '.join(b["text"] for b in blocks if b["type"] == "text").strip()
     except Exception as e:
         return f"_[LLM call failed: {e}]_"
 
 
-def clean_output_text(text):
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = re.sub(r"\s+([,.;:])", r"\1", text)   # remove spaces before punctuation
-    text = re.sub(r"[ \t]+", " ", text)          # normalize repeated spaces
-    text = re.sub(r"\n{3,}", "\n\n", text)       # collapse excessive blank lines
-    return text.strip()
-
-
 projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
 
-You are preparing the inflation outlook section of Tealbook A for the upcoming FOMC meeting.
+You are a Federal Reserve staff economist writing the inflation outlook section of Tealbook A for the upcoming FOMC meeting.
 
-Use web search only to retrieve the most recent available U.S. data as of today for:
-- headline PCE inflation
-- core PCE inflation
-- headline CPI inflation
-- core CPI inflation
-- labor cost growth
-- food price developments
-- energy price developments
-- nonfuel import price developments
+Use web search to retrieve only the most recent available data as of today for:
+- headline PCE inflation,
+- core PCE inflation,
+- headline CPI inflation,
+- core CPI inflation,
+- labor cost growth,
+- energy prices,
+- food prices,
+- nonfuel import prices.
 
-Use this source hierarchy:
-1. BEA for PCE inflation
-2. BLS for CPI, import prices, and labor cost measures
-3. EIA for broad energy-price context
-4. Highly reliable supplementary sources only if needed
+Prioritize official U.S. data releases. Use market or news sources only to supplement recent energy-price developments when official releases lag.
 
 Before writing, determine internally:
-1. the latest observed reading for headline PCE
-2. the latest observed reading for core PCE
-3. the latest observed reading for CPI
-4. the latest observed labor-cost measure
-5. the main driver of headline inflation
-6. the main driver of core inflation
-7. the near-term outlook
-8. the medium-term outlook
-9. the main upside and downside risks
-10. the point at which the forecast begins
+1. the latest reading on headline PCE,
+2. the latest reading on core PCE,
+3. the main current driver of headline inflation,
+4. the main current driver of core inflation,
+5. the most likely near-term path,
+6. the most likely medium-term path,
+7. the main upside risks,
+8. the main downside risks.
 
-Do not output that internal checklist. Output only the final narrative and tables.
+Do not output that internal reasoning. Output only the final narrative and tables.
 
-Substance rules:
-- Anchor the narrative on PCE inflation, not CPI
-- Use CPI and other indicators only as supporting evidence
-- Clearly distinguish observed data from forecast
-- Clearly distinguish temporary relative-price movements from underlying inflation pressure
-- Do not center the narrative on a geopolitical or commodity-market event unless the data clearly indicate that it is the dominant driver of the inflation outlook
-- Do not invent events, policy actions, or data releases
-- Do not relabel dates or periods
-- Every numerical statement must correspond to the correct release period
-- Forecast values must begin only after the last observed release
-- The narrative and tables must be mutually consistent
-
-Writing format:
-- Exactly 3 paragraphs
-- Paragraph 1: current inflation conditions and key drivers
-- Paragraph 2: near-term outlook over the next few months
-- Paragraph 3: medium-term outlook and main risks
+Write exactly 3 paragraphs:
+- Paragraph 1: current inflation conditions and drivers.
+- Paragraph 2: near-term outlook.
+- Paragraph 3: medium-term outlook and risks.
 
 Style rules:
-- Begin immediately with substantive economic analysis
-- No preamble
-- No meta-commentary
-- Do not say “Based on my research,” “Here is,” “I will,” or similar phrases
-- Third person
-- Formal internal staff tone
-- Precise, compact, analytical
-- No dramatic or journalistic language
+- The first sentence must be substantive economic analysis.
+- No preamble, no meta-commentary, no mention of search or sources.
+- No “Based on my research,” “Here is,” “I will,” or similar phrases.
+- Formal internal staff tone, compact and analytical.
+- Anchor on PCE.
+- Distinguish headline from core.
+- Distinguish temporary relative-price shocks from underlying inflation.
 
-After the 3 paragraphs, fill in both tables in markdown.
-
-Table rules:
-- One decimal place
-- Single estimates only
-- Mark with (f) any value that had not yet been released as of today and is therefore a forecast
-- Use observed values where available
-- Use forecasts only for periods after the latest observed release
-- Output complete tables with no commentary before or after them
+After the narrative, fill in both tables in markdown.
+- One decimal place.
+- Single estimates only.
+- Mark forecasted values with (f).
 
 **TABLE 1 — Annual projections (Percent change at annual rate from final quarter of preceding period):**
 
@@ -1639,8 +1590,7 @@ Table rules:
 * Core goods imports exclude computers, semiconductors, oil, and natural gas.
 """
 
-result = call_claude_search(projection_prompt, max_tokens=2400, timeout=90)
-result = clean_output_text(result)
+result = call_claude_search(projection_prompt, max_tokens=2200)
 display(Markdown(result))
 ```
 
