@@ -1524,52 +1524,75 @@ def call_claude_search(user_prompt, max_tokens=2200):
         return f"_[LLM call failed: {e}]_"
 
 
+evidence_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
+
+Retrieve the most recent available U.S. data relevant to the inflation outlook as of today.
+
+Use reliable official sources whenever possible. Prefer BEA, BLS, EIA, and import price data from BLS.
+
+Return only valid JSON with this schema:
+{{
+  "headline_pce_latest": "",
+  "core_pce_latest": "",
+  "headline_cpi_latest": "",
+  "core_cpi_latest": "",
+  "labor_cost_latest": "",
+  "energy_prices_latest": "",
+  "food_prices_latest": "",
+  "import_prices_latest": "",
+  "current_headline_driver": "",
+  "current_core_driver": "",
+  "near_term_headline_outlook": "",
+  "near_term_core_outlook": "",
+  "medium_term_outlook": "",
+  "upside_risks": ["", ""],
+  "downside_risks": ["", ""],
+  "notes_for_forecast_table": ""
+}}
+
+Rules:
+- No markdown.
+- No prose outside the JSON.
+- Keep each field concise.
+- Do not invent missing data.
+- If a series is unavailable, state that clearly."""
+
 projection_prompt = f"""Today is {_today.strftime("%B %d, %Y")}.
 
 You are a Federal Reserve staff economist writing the inflation outlook section of Tealbook A for the upcoming FOMC meeting.
 
-Use web search to retrieve only the most recent available data as of today for:
-- headline PCE inflation,
-- core PCE inflation,
-- headline CPI inflation,
-- core CPI inflation,
-- labor cost growth,
-- energy prices,
-- food prices,
-- nonfuel import prices.
+Use only the evidence provided below. Do not add new facts, events, or policy actions.
 
-Prioritize official U.S. data releases. Use market or news sources only to supplement recent energy-price developments when official releases lag.
+EVIDENCE:
+{evidence_json}
 
-Before writing, determine internally:
-1. the latest reading on headline PCE,
-2. the latest reading on core PCE,
-3. the main current driver of headline inflation,
-4. the main current driver of core inflation,
-5. the most likely near-term path,
-6. the most likely medium-term path,
-7. the main upside risks,
-8. the main downside risks.
+Write the output in two parts.
 
-Do not output that internal reasoning. Output only the final narrative and tables.
-
-Write exactly 3 paragraphs:
-- Paragraph 1: current inflation conditions and drivers.
-- Paragraph 2: near-term outlook.
-- Paragraph 3: medium-term outlook and risks.
+PART 1 — Inflation narrative
+Write exactly 3 paragraphs in Tealbook A style:
+- Paragraph 1: current inflation conditions and the key drivers of headline and core inflation.
+- Paragraph 2: near-term outlook, emphasizing the next few months.
+- Paragraph 3: medium-term outlook and the main upside and downside risks.
 
 Style rules:
-- The first sentence must be substantive economic analysis.
-- No preamble, no meta-commentary, no mention of search or sources.
-- No “Based on my research,” “Here is,” “I will,” or similar phrases.
-- Formal internal staff tone, compact and analytical.
-- Anchor on PCE.
-- Distinguish headline from core.
-- Distinguish temporary relative-price shocks from underlying inflation.
+- Begin immediately with substantive economic analysis.
+- No preamble.
+- No meta-commentary.
+- Do not say “Based on my research,” “Here is,” “I will,” or similar phrases.
+- Formal internal staff tone.
+- Third person.
+- Precise, compact, analytical.
+- Anchor the discussion on PCE inflation.
+- Use CPI and other indicators only as supporting evidence.
+- Distinguish clearly between temporary relative-price movements and underlying inflation pressures.
+- Do not use dramatic or journalistic language.
 
-After the narrative, fill in both tables in markdown.
+PART 2 — Tables
+After the 3 paragraphs, fill in both tables in markdown.
 - One decimal place.
 - Single estimates only.
-- Mark forecasted values with (f).
+- Mark with (f) any value that would not yet have been released as of today and is therefore a forecast.
+- Output complete tables with no commentary before or after them.
 
 **TABLE 1 — Annual projections (Percent change at annual rate from final quarter of preceding period):**
 
