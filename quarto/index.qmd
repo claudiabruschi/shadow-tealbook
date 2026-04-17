@@ -1407,6 +1407,79 @@ show(figF, 'Source: DOL (IC4WSA) via FRED')
 ## Inflation
 
 ```{python}
+#| label: inflation-data
+#| include: false
+
+from dateutil.relativedelta import relativedelta
+
+cpi      = pull_series('CPIAUCSL',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+pce      = pull_series('PCEPI',                start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+core_pce = pull_series('PCEPILFE',             start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+trim_pce = pull_series('PCETRIM12M159SFRBDAL', start=DATA_START).dropna()
+mkt_pce  = pull_series('DPCXRG3M086SBEA',      start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+eci      = pull_series('ECIWAG',               start=DATA_START).dropna().pct_change(4).mul(100).dropna()
+ahe      = pull_series('CES0500000003',         start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+compnfb  = pull_series('COMPNFB',              start=DATA_START).dropna().pct_change(4).mul(100).dropna()
+brent    = pull_series('DCOILBRENTEU',          start=DATA_START).dropna().resample('MS').mean().dropna()
+crb_prx  = pull_series('PALLFNFINDEXM',               start=DATA_START).dropna()
+pce_eng  = pull_series('DNRGRG3M086SBEA', start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+imp_core = pull_series('IREXFDFLS',       start=DATA_START).dropna().pct_change(12).mul(100).dropna()
+tips_fwd = pull_series('T5YIFRM',              start=DATA_START).dropna()
+clev10   = pull_series('EXPINF10YR',           start=DATA_START).dropna()
+mich1yr  = pull_series('MICH',                 start=DATA_START).dropna()
+recession= pull_series('USREC',               start=DATA_START)
+
+cpi_latest      = cpi.iloc[-1];       cpi_date_inf    = month_label(pd.Timestamp(cpi.index[-1]))
+pce_latest      = pce.iloc[-1];       pce_date_inf    = month_label(pd.Timestamp(pce.index[-1]))
+core_latest     = core_pce.iloc[-1];  core_date_inf   = month_label(pd.Timestamp(core_pce.index[-1]))
+trim_latest     = trim_pce.iloc[-1];  trim_date       = month_label(pd.Timestamp(trim_pce.index[-1]))
+mkt_latest      = mkt_pce.iloc[-1];   mkt_date        = month_label(pd.Timestamp(mkt_pce.index[-1]))
+eci_latest      = eci.iloc[-1];       eci_date        = quarter_label(pd.Timestamp(eci.index[-1]))
+ahe_latest      = ahe.iloc[-1];       ahe_date        = month_label(pd.Timestamp(ahe.index[-1]))
+compnfb_latest  = compnfb.iloc[-1];   compnfb_date    = quarter_label(pd.Timestamp(compnfb.index[-1]))
+brent_latest    = brent.iloc[-1];     brent_date      = month_label(pd.Timestamp(brent.index[-1]))
+pce_eng_latest  = pce_eng.iloc[-1];  pce_eng_date  = month_label(pd.Timestamp(pce_eng.index[-1]))
+imp_core_latest = imp_core.iloc[-1]; imp_core_date = month_label(pd.Timestamp(imp_core.index[-1]))
+tips_latest     = tips_fwd.iloc[-1];  tips_date       = month_label(pd.Timestamp(tips_fwd.index[-1]))
+clev10_latest   = clev10.iloc[-1];    clev10_date     = month_label(pd.Timestamp(clev10.index[-1]))
+mich1yr_latest  = mich1yr.iloc[-1];   mich1yr_date    = month_label(pd.Timestamp(mich1yr.index[-1]))
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
+def recession_shapes(rec_series, chart_start):
+    rec = rec_series[chart_start:].copy()
+    shapes, in_rec, start_date = [], False, None
+    for date, val in rec.items():
+        if val == 1 and not in_rec:
+            in_rec, start_date = True, date
+        elif val == 0 and in_rec:
+            in_rec = False
+            shapes.append(dict(type='rect', xref='x', yref='paper',
+                               x0=start_date, x1=date, y0=0, y1=1,
+                               fillcolor='#C8C8C8', opacity=0.35,
+                               line_width=0, layer='below'))
+    if in_rec:
+        shapes.append(dict(type='rect', xref='x', yref='paper',
+                           x0=start_date, x1=rec.index[-1], y0=0, y1=1,
+                           fillcolor='#C8C8C8', opacity=0.35,
+                           line_width=0, layer='below'))
+    return shapes
+
+def x_end(series, extra_months=5):
+    return (pd.Timestamp(series.index[-1]) + pd.DateOffset(months=extra_months)).strftime('%Y-%m-%d')
+
+# ── Date-derived labels for projection table ──────────────────────────────────
+_today   = TODAY
+_yr      = _today.year
+_prev_yr = _yr - 1
+_next_yr = _yr + 1
+_far_yr  = _yr + 2
+_h1      = f"H1 {_yr}"
+_h2      = f"H2 {_yr}"
+_m = [(_today - relativedelta(months=i)).strftime("%b %Y") for i in range(2, -1, -1)]
+_f = [(_today + relativedelta(months=i)).strftime("%b %Y") for i in range(0, 3)]
+```
+
+```{python}
 #| label: inflation-narrative
 #| output: asis
 
